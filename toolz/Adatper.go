@@ -15,20 +15,21 @@ var (
 // See https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/adapter-api.txt
 const dbusIfaceAdapter = "org.bluez.Adapter1"
 const (
-	PropAddress             = "Address"             //readonly, string -> net.HardwareAddr
-	PropAddressType         = "AddressType"         //readonly, string
-	PropName                = "Name"                //readonly, string
-	PropAlias               = "Alias"               //readwrite, string
-	PropClass               = "Class"               //readonly, uint32
-	PropPowered             = "Powered"             //readwrite, bool
-	PropDiscoverable        = "Discoverable"        //readwrite, bool
-	PropPairable            = "Pairable"            //readwrite, bool
-	PropPairableTimeout     = "PairableTimeout"     //readwrite, uint32
-	PropDiscoverableTimeout = "DiscoverableTimeout" //readwrite, uint32
-	PropDiscovering         = "Discovering"         //readonly, bool
-	PropUUIDs               = "UUIDs"               //readonly, []string
-	PropModalias            = "Modalias"            //readonly, optional, string
+	PropAdapterAddress             = "Address"             //readonly, string -> net.HardwareAddr
+	PropAdapterAddressType         = "AddressType"         //readonly, string
+	PropAdapterName                = "Name"                //readonly, string
+	PropAdapterAlias               = "Alias"               //readwrite, string
+	PropAdapterClass               = "Class"               //readonly, uint32
+	PropAdapterPowered             = "Powered"             //readwrite, bool
+	PropAdapterDiscoverable        = "Discoverable"        //readwrite, bool
+	PropAdapterPairable            = "Pairable"            //readwrite, bool
+	PropAdapterPairableTimeout     = "PairableTimeout"     //readwrite, uint32
+	PropAdapterDiscoverableTimeout = "DiscoverableTimeout" //readwrite, uint32
+	PropAdapterDiscovering         = "Discovering"         //readonly, bool
+	PropAdapterUUIDs               = "UUIDs"               //readonly, []string
+	PropAdapterModalias            = "Modalias"            //readonly, optional, string
 )
+
 
 func Exists(adapterName string) (exists bool, err error) {
 	om, err := dbusHelper.NewObjectManager()
@@ -51,6 +52,13 @@ type Adapter1 struct {
 	c *dbusHelper.Client
 }
 
+func (a *Adapter1) Close() {
+	// closes CLients DBus connection
+	a.c.Disconnect()
+}
+
+
+// ToDo: Modify all interface methods to return call.Err
 func (a *Adapter1) StartDiscovery() error {
 	name, err := a.GetName()
 	if err != nil {
@@ -86,7 +94,7 @@ func (a *Adapter1) StopDiscovery() error {
 
 /* Properties */
 func (a *Adapter1) GetAddress() (res net.HardwareAddr, err error) {
-	val, err := a.c.GetProperty(PropAddress)
+	val, err := a.c.GetProperty(PropAdapterAddress)
 	if err != nil {
 		return
 	}
@@ -94,7 +102,7 @@ func (a *Adapter1) GetAddress() (res net.HardwareAddr, err error) {
 }
 
 func (a *Adapter1) GetAddressType() (res string, err error) {
-	val, err := a.c.GetProperty(PropAddressType)
+	val, err := a.c.GetProperty(PropAdapterAddressType)
 	if err != nil {
 		return
 	}
@@ -102,7 +110,7 @@ func (a *Adapter1) GetAddressType() (res string, err error) {
 }
 
 func (a *Adapter1) GetName() (res string, err error) {
-	val, err := a.c.GetProperty(PropName)
+	val, err := a.c.GetProperty(PropAdapterName)
 	if err != nil {
 		return
 	}
@@ -110,11 +118,11 @@ func (a *Adapter1) GetName() (res string, err error) {
 }
 
 func (a *Adapter1) SetAlias(val string) (err error) {
-	return a.c.SetProperty(PropAlias, val)
+	return a.c.SetProperty(PropAdapterAlias, val)
 }
 
 func (a *Adapter1) GetAlias() (res string, err error) {
-	val, err := a.c.GetProperty(PropAlias)
+	val, err := a.c.GetProperty(PropAdapterAlias)
 	if err != nil {
 		return
 	}
@@ -123,7 +131,7 @@ func (a *Adapter1) GetAlias() (res string, err error) {
 }
 
 func (a *Adapter1) GetClass() (res uint32, err error) {
-	val, err := a.c.GetProperty(PropClass)
+	val, err := a.c.GetProperty(PropAdapterClass)
 	if err != nil {
 		return
 	}
@@ -131,7 +139,7 @@ func (a *Adapter1) GetClass() (res uint32, err error) {
 }
 
 func (a *Adapter1) GetPowered() (res bool, err error) {
-	val, err := a.c.GetProperty(PropPowered)
+	val, err := a.c.GetProperty(PropAdapterPowered)
 	if err != nil {
 		return
 	}
@@ -139,11 +147,11 @@ func (a *Adapter1) GetPowered() (res bool, err error) {
 }
 
 func (a *Adapter1) SetPowered(val bool) (err error) {
-	return a.c.SetProperty(PropPowered, val)
+	return a.c.SetProperty(PropAdapterPowered, val)
 }
 
 func (a *Adapter1) GetDiscoverable() (res bool, err error) {
-	val, err := a.c.GetProperty(PropDiscoverable)
+	val, err := a.c.GetProperty(PropAdapterDiscoverable)
 	if err != nil {
 		return
 	}
@@ -151,11 +159,11 @@ func (a *Adapter1) GetDiscoverable() (res bool, err error) {
 }
 
 func (a *Adapter1) SetDiscoverable(val bool) (err error) {
-	return a.c.SetProperty(PropDiscoverable, val)
+	return a.c.SetProperty(PropAdapterDiscoverable, val)
 }
 
 func (a *Adapter1) GetPairable() (res bool, err error) {
-	val, err := a.c.GetProperty(PropPairable)
+	val, err := a.c.GetProperty(PropAdapterPairable)
 	if err != nil {
 		return
 	}
@@ -163,15 +171,15 @@ func (a *Adapter1) GetPairable() (res bool, err error) {
 }
 
 func (a *Adapter1) SetPairable(val bool) (err error) {
-	return a.c.SetProperty(PropPairable, val)
+	return a.c.SetProperty(PropAdapterPairable, val)
 }
 
 func (a *Adapter1) SetDiscoverableTimeout(val uint32) (err error) {
-	return a.c.SetProperty(PropDiscoverableTimeout, val)
+	return a.c.SetProperty(PropAdapterDiscoverableTimeout, val)
 }
 
 func (a *Adapter1) GetDiscoverableTimeout() (res uint32, err error) {
-	val, err := a.c.GetProperty(PropDiscoverableTimeout)
+	val, err := a.c.GetProperty(PropAdapterDiscoverableTimeout)
 	if err != nil {
 		return
 	}
@@ -179,11 +187,11 @@ func (a *Adapter1) GetDiscoverableTimeout() (res uint32, err error) {
 }
 
 func (a *Adapter1) SetPairableTimeout(val uint32) (err error) {
-	return a.c.SetProperty(PropPairableTimeout, val)
+	return a.c.SetProperty(PropAdapterPairableTimeout, val)
 }
 
 func (a *Adapter1) GetPairableTimeout() (res uint32, err error) {
-	val, err := a.c.GetProperty(PropPairableTimeout)
+	val, err := a.c.GetProperty(PropAdapterPairableTimeout)
 	if err != nil {
 		return
 	}
@@ -191,7 +199,7 @@ func (a *Adapter1) GetPairableTimeout() (res uint32, err error) {
 }
 
 func (a *Adapter1) GetDiscovering() (res bool, err error) {
-	val, err := a.c.GetProperty(PropDiscovering)
+	val, err := a.c.GetProperty(PropAdapterDiscovering)
 	if err != nil {
 		return
 	}
@@ -199,7 +207,7 @@ func (a *Adapter1) GetDiscovering() (res bool, err error) {
 }
 
 func (a *Adapter1) GetUUIDs() (res []string, err error) {
-	val, err := a.c.GetProperty(PropUUIDs)
+	val, err := a.c.GetProperty(PropAdapterUUIDs)
 	if err != nil {
 		return
 	}
@@ -207,7 +215,7 @@ func (a *Adapter1) GetUUIDs() (res []string, err error) {
 }
 
 func (a *Adapter1) GetModalias() (res string, err error) {
-	val, err := a.c.GetProperty(PropModalias)
+	val, err := a.c.GetProperty(PropAdapterModalias)
 	if err != nil {
 		return
 	}

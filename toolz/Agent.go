@@ -10,6 +10,11 @@ import (
 const DBusAgent1Interface = "org.bluez.Agent1"
 const DBUSAgent1Path = "/org/bluez/testagent"
 
+var ErrRejected = dbus.NewError("org.bluez.Error.Rejected", nil)
+var ErrCanceled = dbus.NewError("org.bluez.Error.Canceled", nil)
+
+// ToDo: allow enabling "simple pairing" (sspmode set via hcitool)
+
 type Agent1Interface interface {
 	Release() *dbus.Error
 	RequestPinCode(device dbus.ObjectPath) *dbus.Error
@@ -31,7 +36,7 @@ func (TestAgent) Release() *dbus.Error {
 
 func (TestAgent) RequestPinCode(device dbus.ObjectPath) (pincode string, err *dbus.Error) {
 	fmt.Println("RequestPinCode called: ", device)
-	return "1456",nil
+	return "1337",nil
 }
 
 func (TestAgent) DisplayPinCode(device dbus.ObjectPath, pincode string) *dbus.Error {
@@ -39,10 +44,18 @@ func (TestAgent) DisplayPinCode(device dbus.ObjectPath, pincode string) *dbus.Er
 	return nil
 }
 
-/*
 func (TestAgent) RequestPasskey(device dbus.ObjectPath) (passkey uint32, err *dbus.Error) {
 	fmt.Println("RequestPasskey called: ", device)
-	return uint32(12344),nil
+	dev,errd := Device(string(device)+"a")
+	if errd != nil {
+		fmt.Println(errd)
+		return 0, ErrCanceled
+	}
+	dev.SetTrusted(true)
+
+	// Enter passkey presented by the remote device
+
+	return 0000,nil
 }
 
 func (TestAgent) DisplayPasskey(device dbus.ObjectPath, passkey uint32, entered uint16) *dbus.Error {
@@ -52,6 +65,12 @@ func (TestAgent) DisplayPasskey(device dbus.ObjectPath, passkey uint32, entered 
 
 func (TestAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) *dbus.Error {
 	fmt.Println("RequestConfirmation called: ", device, passkey)
+	path := string(device)
+	dev,err := Device(path)
+	if err != nil {
+		return ErrRejected
+	}
+	dev.SetTrusted(true)
 	return nil
 }
 
@@ -59,7 +78,7 @@ func (TestAgent) RequestAuthorization(device dbus.ObjectPath) *dbus.Error {
 	fmt.Println("RequestAuthorization called: ", device)
 	return nil
 }
-*/
+
 func (TestAgent) AuthorizeService(device dbus.ObjectPath, uuid string) *dbus.Error {
 	fmt.Println("AuthorizeService called: ", device, uuid)
 	return nil

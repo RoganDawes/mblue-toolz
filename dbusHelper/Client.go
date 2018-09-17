@@ -127,7 +127,10 @@ func (c *Client) SetProperty(name string, value interface{}) (err error){
 	}
 
 	call := c.connBusObj.Call("org.freedesktop.DBus.Properties.Set", 0, c.connInterface, name, dbus.MakeVariant(value))
-	err = call.Store()
-	fmt.Printf("Set err: %+v\n", err)
+	err = call.Err
+	if err != nil {
+		fmt.Printf("Error setting Property '%s': %+v\n", name, err)
+	}
+
 	return err
 }

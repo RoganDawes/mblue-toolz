@@ -147,6 +147,10 @@ func main() {
 	err = toolz.RegisterTestAgent()
 	if err != nil { panic(err)}
 
+	// Enable PAN network service
+	nwSrv, err := toolz.NetworkServer("hci0")
+	nwSrv.Register("nap", "testbr")
+
 	/*
 	am,err := toolz.AgentManager()
 	if err != nil {
