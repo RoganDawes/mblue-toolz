@@ -27,6 +27,8 @@ import (
 //
 // Misbehaviour only seems to be avoidable, if the socket is used exclusively (e.g. no other bluetooth service running)
 
+const INDEX_CONTROLLER_NONE = uint16(0xFFFF) //https://elixir.bootlin.com/linux/v3.7/source/include/net/bluetooth/hci.h#L1457
+
 var (
 	ErrSocketOpen         = errors.New("Opening socket failed")
 	ErrSocketBind         = errors.New("Binding socket failed")
@@ -64,7 +66,7 @@ func NewMgmtConnection() (res *MgmtConnection, err error) {
 		isConnected: false,
 		saHciCtrl: unix.SockaddrHCI{
 			Channel: unix.HCI_CHANNEL_CONTROL,
-			Dev:     uint16(HCI_DEV_NONE),
+			Dev:     uint16(INDEX_CONTROLLER_NONE),
 		},
 		abortEventHandlerLoop: make(chan interface{}),
 		newRawPacket:          make(chan []byte), // no buffer
@@ -88,17 +90,17 @@ func NewMgmtConnection() (res *MgmtConnection, err error) {
 }
 
 func (m *MgmtConnection) AddListener(l MgmtEventListener) {
-	fmt.Println("Listener marked for addition")
+	//fmt.Println("Listener marked for addition")
 	m.addListener <- l
 }
 
 func (m *MgmtConnection) RemoveListener(l MgmtEventListener) {
-	fmt.Println("Listener marked for remove")
+	//fmt.Printf("Listener marked for remove: %v\n", l)
 	m.removeListener <- l
 }
 
 func (m *MgmtConnection) socketReaderLoop() {
-	fmt.Println("Readloop started")
+	//fmt.Println("Readloop started")
 	rcvBuf := make([]byte, 1024)
 	for {
 		n, err := m.Read(rcvBuf)
@@ -110,7 +112,7 @@ func (m *MgmtConnection) socketReaderLoop() {
 		evtPacket := make([]byte, n)
 		copy(evtPacket, rcvBuf) // Copy over as many bytes as readen
 
-		fmt.Printf("Sending raw event packet to handler loop: %+v\n", evtPacket)
+		//fmt.Printf("Sending raw event packet to handler loop: %+v\n", evtPacket)
 		select {
 		case m.newRawPacket <- evtPacket:
 			// do nothing
@@ -121,16 +123,19 @@ func (m *MgmtConnection) socketReaderLoop() {
 		}
 	}
 
-	fmt.Println("Socket read loop exitted")
+	//fmt.Println("Socket read loop exited")
 }
 
 func (m *MgmtConnection) eventHandlerLoop() {
-	fmt.Println("Event handler started")
+	//fmt.Println("Event handler started")
+
+	listenerDeleteMap := make(map[MgmtEventListener]bool)
+
 	Outer:
 	for {
 		select {
 		case <-m.abortEventHandlerLoop:
-			fmt.Println("Event Handler aborted")
+			//fmt.Println("Event Handler aborted")
 			//empty event receive channel
 			fl:
 			for len(m.newRawPacket) > 0 {
@@ -155,11 +160,19 @@ func (m *MgmtConnection) eventHandlerLoop() {
 				select {
 				case l.EventInput() <- *evt:
 				case <- l.Context().Done():
-					m.RemoveListener(l) // shouldn't produce a dead lock
+					//m.RemoveListener(l) // could produce a dead lock
+					listenerDeleteMap[l] = true
 					continue Inner
 				}
 			}
+
+			for delme,_:= range listenerDeleteMap {
+				//Remove listener directly to avoid dealocking this select branch
+				//m.RemoveListener(delme)
+				delete(m.registeredListeners, delme)
+			}
 			m.mutexListeners.Unlock()
+
 			/*
 			fmt.Printf("Dispatching event: %+v\n", evt)
 			m.dispatchEvent(evt)
@@ -170,14 +183,33 @@ func (m *MgmtConnection) eventHandlerLoop() {
 			m.registeredListeners[newListener] = true
 			m.mutexListeners.Unlock()
 		case deleteListener := <-m.removeListener:
-			// add new listener
+			// remove listener
 			m.mutexListeners.Lock()
+			fmt.Printf("Removed listener %v\n", deleteListener)
 			delete(m.registeredListeners, deleteListener)
 			m.mutexListeners.Unlock()
 		}
 	}
 	fmt.Println("Event handler stopped")
 }
+
+func (m *MgmtConnection) RunCmd(controllerId uint16, cmdCode BtMgmtCmdCode, params ...byte) (resultParsams *[]byte, err error) {
+	command := NewMgmtCmd(
+		cmdCode,
+		controllerId,
+		params...,
+	)
+
+	// created listener for given command
+	commandL := NewCmdDefaultListener(command)
+	// register listener for command result
+	m.AddListener(commandL)
+	// send command
+	m.SendCmd(command)
+
+	return commandL.WaitResult(defaultCommandTimeout)
+}
+
 
 /*
 func (m *MgmtConnection) dispatchEvent(ev *MgmtEvent) {
@@ -272,7 +304,7 @@ func (m *MgmtConnection) SendCmd(command MgmtCommand) (err error) {
 		}
 		off += n
 	}
-	fmt.Printf("Raw packet sent: %+v\n", sendbuf)
+	//fmt.Printf("Raw packet sent: %+v\n", sendbuf)
 	return nil
 
 }
@@ -294,6 +326,7 @@ func (m *MgmtConnection) ReadBytes(count int) (res *[]byte, err error) {
 	return &readen, nil
 }
 
+/*
 func (m *MgmtConnection) ReadEvt() (hdr *MgmtEvent, err error) {
 	rawHdr, err := m.ReadBytes(6)
 	if err != nil {
@@ -314,6 +347,7 @@ func (m *MgmtConnection) ReadEvt() (hdr *MgmtEvent, err error) {
 
 	return hdr, nil
 }
+*/
 
 func parseEvt(evt_packet []byte) (evt *MgmtEvent, err error) {
 	// ToDo: Error check
@@ -342,4 +376,4 @@ func (m *MgmtConnection) Disconnect() (err error) {
 	return
 }
 
-const HCI_DEV_NONE = uint16(0xFFFF) //https://elixir.bootlin.com/linux/v3.7/source/include/net/bluetooth/hci.h#L1457
+

@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 
@@ -79,21 +78,14 @@ func main() {
 	mgmt,err := btmgmt.NewMgmtConnection()
 	fmt.Printf("NewMgmtConnection: %+v\n", err)
 
-	time.Sleep(2*time.Second)
-	fmt.Println("Sending command ...")
-	command := btmgmt.NewMgmtCmd(
-		btmgmt.BT_MGMT_CMD_SET_SIMPLE_SECURE_PAIRING,
-		btmgmt.HCI_DEV_NONE,
-		0,
-	)
-
-	// created listener for given command
-	commandL := btmgmt.NewCmdDefaultListener(command)
-	// register listener before sending command
-	mgmt.AddListener(commandL)
-	// send command
-	mgmt.SendCmd(command)
+	// ToDo: proper errors on disconnect + check if loops are stopped and all channel closed (avoid memory leaks)
 	//mgmt.Disconnect()
+
+	// ToDo: Generic EventListener (not only listening to command responses) --> ListenForEvID(eventID BtMgmtEvtCode, callback func(event MgmtEvent, cancel mutexCancelFunc))
+	fmt.Println("Run command ...")
+	cmdRes,cmdErr := mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
+	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+
 	fmt.Println("SOCK TEST END\n===============")
 	/*
 	End Bluetooth Control based socket management tests

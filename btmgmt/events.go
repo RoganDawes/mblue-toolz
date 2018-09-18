@@ -5,9 +5,9 @@ import (
 )
 
 var (
-	ErrEvtRdHdr           = errors.New("BtSocket not able to read event header")
-	ErrEvtParseHdr        = errors.New("BtSocket not able to parse event header")
-	ErrEvtRdPayload       = errors.New("BtSocket not able to read event payload")
+	ErrEvtRdHdr     = errors.New("BtSocket not able to read event header")
+	ErrEvtParseHdr  = errors.New("BtSocket not able to parse event header")
+	ErrEvtRdPayload = errors.New("BtSocket not able to read event payload")
 )
 
 type MgmtEvent struct {
@@ -137,7 +137,7 @@ const (
 	BT_MGMT_CMD_STATUS_NOT_PAIRED            BtMgmtCmdStatus = 0x06
 	BT_MGMT_CMD_STATUS_NO_RESOURCES          BtMgmtCmdStatus = 0x07
 	BT_MGMT_CMD_STATUS_TIMEOUT               BtMgmtCmdStatus = 0x08
-	BT_MGMT_CMD_STATUS_ALREADY_CONNECTEWD    BtMgmtCmdStatus = 0x09
+	BT_MGMT_CMD_STATUS_ALREADY_CONNECTED     BtMgmtCmdStatus = 0x09
 	BT_MGMT_CMD_STATUS_BUSY                  BtMgmtCmdStatus = 0x0A
 	BT_MGMT_CMD_STATUS_REJECTED              BtMgmtCmdStatus = 0x0B
 	BT_MGMT_CMD_STATUS_NOT_SUPPORTED         BtMgmtCmdStatus = 0x0C
@@ -150,3 +150,32 @@ const (
 	BT_MGMT_CMD_STATUS_ALREADY_PAIRED        BtMgmtCmdStatus = 0x13
 	BT_MGMT_CMD_STATUS_PERMISSION_DENIED     BtMgmtCmdStatus = 0x14
 )
+
+var CmdStatusErrorMap = genCmdStatusErrorMap()
+func genCmdStatusErrorMap() (eMap map[BtMgmtCmdStatus]error) {
+	eMap = make(map[BtMgmtCmdStatus]error)
+	eMap[BT_MGMT_CMD_STATUS_SUCCESS] = nil
+	eMap[BT_MGMT_CMD_STATUS_UNKNOWN_COMMAND] = errors.New("Unknown command")
+	eMap[BT_MGMT_CMD_STATUS_NOT_CONNECTED] = errors.New("Not connected")
+	eMap[BT_MGMT_CMD_STATUS_FAILED] = errors.New("Failed")
+	eMap[BT_MGMT_CMD_STATUS_CONNECT_FAILED] = errors.New("Connect failed")
+	eMap[BT_MGMT_CMD_STATUS_AUTHENTICATION_FAILED] = errors.New("Authentication failed")
+	eMap[BT_MGMT_CMD_STATUS_NOT_PAIRED] = errors.New("Not paired")
+	eMap[BT_MGMT_CMD_STATUS_NO_RESOURCES] = errors.New("No resources")
+	eMap[BT_MGMT_CMD_STATUS_TIMEOUT] = errors.New("Timeout")
+	eMap[BT_MGMT_CMD_STATUS_ALREADY_CONNECTED] = errors.New("Already connected")
+	eMap[BT_MGMT_CMD_STATUS_BUSY] = errors.New("Busy")
+	eMap[BT_MGMT_CMD_STATUS_REJECTED] = errors.New("Rejected")
+	eMap[BT_MGMT_CMD_STATUS_NOT_SUPPORTED] = errors.New("Not supported")
+	eMap[BT_MGMT_CMD_STATUS_INVALID_PARAMETERS] = errors.New("Invalid parameters")
+	eMap[BT_MGMT_CMD_STATUS_DISCONNECTED] = errors.New("Disconnected")
+	eMap[BT_MGMT_CMD_STATUS_NOT_POWERED] = errors.New("Not powered")
+	eMap[BT_MGMT_CMD_STATUS_CANCELLED] = errors.New("Cancelled")
+	eMap[BT_MGMT_CMD_STATUS_INVALID_INDEX] = errors.New("Invalid index")
+	eMap[BT_MGMT_CMD_STATUS_RF_KILLED] = errors.New("RFKilled")
+	eMap[BT_MGMT_CMD_STATUS_ALREADY_PAIRED] = errors.New("Already paired")
+	eMap[BT_MGMT_CMD_STATUS_PERMISSION_DENIED] = errors.New("Permission denied")
+
+
+	return eMap
+}

@@ -3,8 +3,15 @@ package btmgmt
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
+	"errors"
+	"time"
 )
+
+var (
+	ErrCmdTimeout = errors.New("Command reached timeout")
+)
+
+const defaultCommandTimeout = time.Second * 30
 
 type MgmtCommand struct {
 	CommandCode   BtMgmtCmdCode
@@ -16,11 +23,16 @@ type MgmtCommand struct {
 func (mc MgmtCommand) toWire() []byte {
 	wire := make([]byte, 6)
 	binary.LittleEndian.PutUint16(wire[0:2], uint16(mc.CommandCode))
-	if mc.ControllerIdx == HCI_DEV_NONE {
+
+	/*
+	if mc.ControllerIdx == INDEX_CONTROLLER_NONE {
 		binary.LittleEndian.PutUint16(wire[2:4], 0)
 	} else {
 		binary.LittleEndian.PutUint16(wire[2:4], mc.ControllerIdx)
 	}
+	*/
+	binary.LittleEndian.PutUint16(wire[2:4], mc.ControllerIdx)
+
 	binary.LittleEndian.PutUint16(wire[4:6], uint16(mc.ParamLen))
 
 	wire = append(wire, mc.Payload...)
@@ -41,10 +53,9 @@ type MgmtCommandDefaultListener struct {
 	cancel context.CancelFunc
 	srcCmd MgmtCommand // the command
 	evtIn  chan MgmtEvent
-}
 
-func (l *MgmtCommandDefaultListener) handleEvents() {
-
+	resParam *[]byte
+	resErr   error
 }
 
 func (l MgmtCommandDefaultListener) EventInput() chan<- MgmtEvent {
@@ -55,9 +66,30 @@ func (l MgmtCommandDefaultListener) Context() context.Context {
 	return l.ctx
 }
 
-func NewCmdDefaultListener(srcCmd MgmtCommand) (res *MgmtCommandDefaultListener) {
+func (l *MgmtCommandDefaultListener) WaitResult(timeout time.Duration) (*[]byte, error) {
+	timeoutCtx, cancelWait := context.WithTimeout(context.Background(), timeout)
+	select {
+	case <-timeoutCtx.Done():
+		// free cancel func by calling
+		cancelWait()
+		// cancelListener
+		l.cancel()
+		// return error
+		l.resErr = ErrCmdTimeout
+	case <-l.ctx.Done():
+		// The context of the listener was closed, this could happen because:
+		// 1) A command status event was received (maybe with error)
+		// 2) A command complete event was received (with success / error)
+		cancelWait() //free local cancel listener
+	}
+
+
+	return l.resParam, l.resErr
+}
+
+func NewCmdDefaultListener(srcCmd MgmtCommand) (cmdResultListener *MgmtCommandDefaultListener) {
 	ctx, cancel := context.WithCancel(context.Background())
-	res = &MgmtCommandDefaultListener{
+	cmdResultListener = &MgmtCommandDefaultListener{
 		evtIn:  make(chan MgmtEvent),
 		ctx:    ctx,
 		cancel: cancel,
@@ -67,34 +99,74 @@ func NewCmdDefaultListener(srcCmd MgmtCommand) (res *MgmtCommandDefaultListener)
 	go func() {
 		for {
 			select {
-			case ev := <-res.evtIn:
-				fmt.Printf("Listener received Event: %+v\n", ev)
-				switch ev.EventCode {
-				case BT_MGMT_EVT_COMMAND_STATUS:
-					cmdCode, state, perr := ParseEvtCmdStatus(ev.Payload)
-					if perr == nil {
-						fmt.Printf("Parsed Command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
-						if cmdCode == srcCmd.CommandCode {
-							fmt.Println("Command code match, could be reply ... NOT cancelling listener")
+			case ev := <-cmdResultListener.evtIn:
+				// check if event is for same controller as the command
+				//fmt.Printf("Default command listener received Event: %+v\n", ev)
+				if ev.ControllerIdx == cmdResultListener.srcCmd.ControllerIdx {
+					switch ev.EventCode {
+					case BT_MGMT_EVT_COMMAND_STATUS:
+						cmdCode, state, parseErr := ParseEvtCmdStatus(ev.Payload)
+						if parseErr == nil {
+							//fmt.Printf("Parsed Command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
+							if cmdCode == srcCmd.CommandCode {
+								//fmt.Println("... CommandCode matches, cancelling listener")
+								// set correct error value (read by WaitResult)
+								if statusErr, exists := CmdStatusErrorMap[state]; exists {
+									cmdResultListener.resErr = statusErr
+								} else {
+									cmdResultListener.resErr = errors.New("Unknown command status for received event")
+								}
+
+								cmdResultListener.cancel()
+							}
+							/*
+							} else {
+								fmt.Printf("... Listener ignored CommandStatus Event because of CommandCode mismatch (cmd: %d, evt: %d)\n", cmdResultListener.srcCmd.CommandCode, cmdCode)
+							}
+							*/
 						}
-					} else {
-						fmt.Printf("Error parsing command status event: %v\n", perr)
-					}
-				case BT_MGMT_EVT_COMMAND_COMPLETE:
-					cmdCode, state, result, perr := ParseEvtCmdComplete(ev.Payload)
-					if perr == nil {
-						fmt.Printf("Parsed Command Complete Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, result)
-						if cmdCode == srcCmd.CommandCode {
-							fmt.Println("Command code match, could be reply ... cancelling listener")
-							res.cancel()
+						/*
+						} else {
+							fmt.Printf("... Error parsing CommandStatus event: %v\n", parseErr) // in case we missed our event, due to parsing error we still have a timeout
 						}
-					} else {
-						fmt.Printf("Error parsing command complete event: %v\n", perr)
+						*/
+					case BT_MGMT_EVT_COMMAND_COMPLETE:
+						cmdCode, state, resultParams, parseErr := ParseEvtCmdComplete(ev.Payload)
+						if parseErr == nil {
+							//fmt.Printf("Parsed CommandComplete Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
+							if cmdCode == srcCmd.CommandCode {
+								//fmt.Println("... CommandCode matches, cancelling listener")
+								// set correct error value and result params (read by WaitResult)
+								if statusErr, exists := CmdStatusErrorMap[state]; exists {
+									cmdResultListener.resErr = statusErr
+									cmdResultListener.resParam = &resultParams
+								} else {
+									cmdResultListener.resErr = errors.New("Unknown command status for received event")
+								}
+
+								cmdResultListener.cancel()
+							}
+							/*
+							} else {
+								fmt.Printf("... Listener ignored CommandComplete Event because of CommandCode mismatch (cmd: %d, evt: %d)\n", cmdResultListener.srcCmd.CommandCode, cmdCode)
+							}
+							*/
+						}
+						/*
+						} else {
+							fmt.Printf("... Error parsing CommandComplete event: %v\n", parseErr) // in case we missed our event, due to parsing error we still have a timeout
+						}
+						*/
+					default:
+						//fmt.Println("... Event not handled by default CommandDefaultListener")
 					}
-				default:
-					fmt.Println("... Event not handled by default CommandDefaultListener")
 				}
-			case <-res.ctx.Done():
+				/*
+				} else {
+					fmt.Printf("... Listener ignored event for different controller (cmd: %d, evt: %d)\n", cmdResultListener.srcCmd.ControllerIdx, ev.ControllerIdx)
+				}
+				*/
+			case <-cmdResultListener.ctx.Done():
 				//abort
 				return
 			}
@@ -102,7 +174,7 @@ func NewCmdDefaultListener(srcCmd MgmtCommand) (res *MgmtCommandDefaultListener)
 		}
 	}()
 
-	return res
+	return cmdResultListener
 }
 
 /*
@@ -173,16 +245,16 @@ status code.
 type BtMgmtCmdCode uint16
 
 const (
-	BT_MGMT_CMD_READ_VERSION                    BtMgmtCmdCode = 0x01
-	BT_MGMT_CMD_READ_SUPPORTED_COMMANDS         BtMgmtCmdCode = 0x02
-	BT_MGMT_CMD_READ_CONTROLLER_INDEX_LIST      BtMgmtCmdCode = 0x03
-	BT_MGMT_CMD_READ_CONTROLLER_INFO            BtMgmtCmdCode = 0x04
-	BT_MGMT_CMD_SET_POWERED                     BtMgmtCmdCode = 0x05
-	BT_MGMT_CMD_SET_DISCOVERABLE                BtMgmtCmdCode = 0x06
-	BT_MGMT_CMD_SET_CONNECTABLE                 BtMgmtCmdCode = 0x07
-	BT_MGMT_CMD_SET_FAST_CONNECTABLE            BtMgmtCmdCode = 0x08
-	BT_MGMT_CMD_SET_BONDABLE                    BtMgmtCmdCode = 0x09
-	BT_MGMT_CMD_SET_LINK_SECURITY               BtMgmtCmdCode = 0x0A
+	BT_MGMT_CMD_READ_VERSION                       BtMgmtCmdCode = 0x01
+	BT_MGMT_CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS BtMgmtCmdCode = 0x02
+	BT_MGMT_CMD_READ_CONTROLLER_INDEX_LIST         BtMgmtCmdCode = 0x03
+	BT_MGMT_CMD_READ_CONTROLLER_INFO               BtMgmtCmdCode = 0x04
+	BT_MGMT_CMD_SET_POWERED                        BtMgmtCmdCode = 0x05
+	BT_MGMT_CMD_SET_DISCOVERABLE                   BtMgmtCmdCode = 0x06
+	BT_MGMT_CMD_SET_CONNECTABLE                    BtMgmtCmdCode = 0x07
+	BT_MGMT_CMD_SET_FAST_CONNECTABLE               BtMgmtCmdCode = 0x08
+	BT_MGMT_CMD_SET_BONDABLE                       BtMgmtCmdCode = 0x09
+	BT_MGMT_CMD_SET_LINK_SECURITY                  BtMgmtCmdCode = 0x0A
 	BT_MGMT_CMD_SET_SIMPLE_SECURE_PAIRING       BtMgmtCmdCode = 0x0B
 	BT_MGMT_CMD_SET_HIGH_SPEED                  BtMgmtCmdCode = 0x0C
 	BT_MGMT_CMD_SET_LOW_ENERGY                  BtMgmtCmdCode = 0x0D
@@ -219,4 +291,3 @@ const (
 	// ToDo: define missing
 	BT_MGMT_CMD_SET_PHY_CONFIGURATION BtMgmtCmdCode = 0x44
 )
-
