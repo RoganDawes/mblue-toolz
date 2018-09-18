@@ -89,7 +89,7 @@ func (TestAgent) Cancel() *dbus.Error {
 	return nil
 }
 
-func RegisterTestAgent() (err error) {
+func RegisterTestAgent(caps AgentCapability) (err error) {
 	fmt.Println("====================")
 
 	agent_path := DBUSAgent1Path
@@ -128,7 +128,7 @@ func RegisterTestAgent() (err error) {
 	// Register agent
 	am,err := AgentManager()
 	if err != nil { return err }
-	err = am.RegisterAgent(dbus.ObjectPath(agent_path), AGENT_CAP_NO_INPUT_NO_OUTPUT)
+	err = am.RegisterAgent(dbus.ObjectPath(agent_path), caps)
 	if err != nil { return err }
 	// Set Application Agent as Default Agent
 	err = am.RequestDefaultAgent(dbus.ObjectPath(agent_path))

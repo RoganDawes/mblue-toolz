@@ -2,97 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/godbus/dbus"
+	"github.com/mame82/mblue-toolz/btmgmt"
 	"github.com/mame82/mblue-toolz/toolz"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
-func Eavesdrop() {
-	conn, err := dbus.SessionBus()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
-		os.Exit(1)
-	}
 
-	for _, v := range []string{"method_call", "method_return", "error", "signal"} {
-		call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
-			"eavesdrop='true',type='"+v+"'")
-		if call.Err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to add match:", call.Err)
-			os.Exit(1)
-		}
-	}
-	c := make(chan *dbus.Message, 10)
-	conn.Eavesdrop(c)
-	fmt.Println("Listening for everything")
-	for v := range c {
-		fmt.Println(v)
-	}
-}
-
-func PropTest() (err error) {
-	conn,err := dbus.SystemBus()
-	if err != nil { return }
-	co := conn.Object("org.bluez", "/")
-	fmt.Println(co.Path())
-
-
-	return
-}
-
-/*
-&map[
-	/org/bluez:map[
-		org.bluez.AgentManager1:map[]
-		org.bluez.ProfileManager1:map[]
-		org.bluez.HealthManager1:map[]
-		org.freedesktop.DBus.Introspectable:map[]
-	]
-	/org/bluez/hci0:map[
-		org.bluez.NetworkServer1:map[]
-		org.freedesktop.DBus.Introspectable:map[]
-		org.bluez.Adapter1:map[
-			PairableTimeout:@u 0
-			Discovering:false
-			Modalias:"usb:v1D6Bp0246d0531"
-			Class:@u 786700
-			Powered:true
-			UUIDs:[
-				"00001112-0000-1000-8000-00805f9b34fb",
-				"00001801-0000-1000-8000-00805f9b34fb",
-				"0000110e-0000-1000-8000-00805f9b34fb",
-				"00001800-0000-1000-8000-00805f9b34fb",
-				"00001200-0000-1000-8000-00805f9b34fb",
-				"0000110c-0000-1000-8000-00805f9b34fb",
-				"0000110a-0000-1000-8000-00805f9b34fb",
-				"0000110b-0000-1000-8000-00805f9b34fb",
-				"00001108-0000-1000-8000-00805f9b34fb"
-			]
-			AddressType:"public"
-			Name:"who-knows"
-			Alias:"who-knows"
-			DiscoverableTimeout:@u 0
-			Pairable:true
-			Address:"34:E6:AD:51:B5:84"
-			Discoverable:true
-		]
-		org.freedesktop.DBus.Properties:map[]
-		org.bluez.GattManager1:map[]
-		org.bluez.LEAdvertisingManager1:map[
-			ActiveInstances:@y 0x0
-			SupportedInstances:@y 0x5
-			SupportedIncludes:[
-				"tx-power",
-				"appearance",
-				"local-name"]
-			]
-		org.bluez.Media1:map[]
-	]
-]
-
- */
 
 
 func main() {
@@ -143,24 +61,51 @@ func main() {
 	fmt.Printf("Modalias: %+v %+v\n", modalias, err)
 
 
-
-	err = toolz.RegisterTestAgent()
+	// Test agent (functionality depends on caps)
+	err = toolz.RegisterTestAgent(toolz.AGENT_CAP_DISPLAY_ONLY)
 	if err != nil { panic(err)}
 
-	// Enable PAN network service
+	// Test enable PAN network service (bridge with name testbr has to be created upfront, handled by P4wnP1 netlink interface)
 	nwSrv, err := toolz.NetworkServer("hci0")
 	nwSrv.Register("nap", "testbr")
 
+
+
 	/*
-	am,err := toolz.AgentManager()
-	if err != nil {
-		fmt.Println("Error creating AgentManager")
-	}
-	am.RegisterAgent(dbus.ObjectPath())
-*/
+	Test Bluetooth Control based socket management (under construction)
+	 */
+	fmt.Println("SOCK TEST\n===============")
+
+	mgmt,err := btmgmt.NewMgmtConnection()
+	fmt.Printf("NewMgmtConnection: %+v\n", err)
+
+	time.Sleep(2*time.Second)
+	fmt.Println("Sending command ...")
+	command := btmgmt.NewMgmtCmd(
+		btmgmt.BT_MGMT_CMD_SET_SIMPLE_SECURE_PAIRING,
+		btmgmt.HCI_DEV_NONE,
+		0,
+	)
+
+	// created listener for given command
+	commandL := btmgmt.NewCmdDefaultListener(command)
+	// register listener before sending command
+	mgmt.AddListener(commandL)
+	// send command
+	mgmt.SendCmd(command)
+	//mgmt.Disconnect()
+	fmt.Println("SOCK TEST END\n===============")
+	/*
+	End Bluetooth Control based socket management tests
+	 */
+
+
+	// Prevent process from exiting, till SIGTERM or SIGINT
 	fmt.Println("Stop with SIGTERM or SIGINT")
 	sig := make(chan os.Signal)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	si := <-sig
-	fmt.Printf("Signal (%v) received, ending P4wnP1_service ...\n", si)
+	fmt.Printf("Signal (%v) received, ending process ...\n", si)
+	// close socket to avoid leaking
+	mgmt.Disconnect()
 }
