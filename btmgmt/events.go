@@ -40,22 +40,24 @@ func (l *defaultCmdEvtListener) Filter(event Event) (consume bool) {
 
 	switch event.EventCode {
 	case EVT_COMMAND_STATUS:
-		cmdCode, _, parseErr := parseEvtCmdStatus(event.Payload)
+		cmdStatus := &CommandStatusEvent{}
+		parseErr := cmdStatus.UpdateFromPayload(event.Payload)
 		if parseErr == nil {
 			//fmt.Printf("Parsed command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
-			if cmdCode == l.srcCmd.CommandCode {
+			if cmdStatus.CmdCode == l.srcCmd.CommandCode {
 				return true
 			} // ignore events with wrong cmdCode
-		} //Ignore CommandStatus events which couldn't be parsed
+		} //Ignore CommandStatusEvent events which couldn't be parsed
 	case EVT_COMMAND_COMPLETE:
-		cmdCode, _, _, parseErr := parseEvtCmdComplete(event.Payload)
+		cmdComplete := &CommandCompleteEvent{}
+		parseErr := cmdComplete.UpdateFromPayload(event.Payload)
 		if parseErr == nil {
-			//fmt.Printf("Parsed CommandComplete Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
-			if cmdCode == l.srcCmd.CommandCode {
+			//fmt.Printf("Parsed CommandCompleteEvent Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
+			if cmdComplete.CmdCode == l.srcCmd.CommandCode {
 				//fmt.Println("... CommandCode matches, cancelling listener")
 				return true
 			} // ignore events with wrong cmdCode
-		} //Ignore CommandStatus events which couldn't be parsed
+		} //Ignore CommandStatusEvent events which couldn't be parsed
 	default:
 		return false // ignore events with different commandCode
 	}
@@ -67,13 +69,14 @@ func (l *defaultCmdEvtListener) Handle(event Event) (finished bool) {
 
 	switch event.EventCode {
 	case EVT_COMMAND_STATUS:
-		cmdCode, state, parseErr := parseEvtCmdStatus(event.Payload)
+		cmdStatus := &CommandStatusEvent{}
+		parseErr := cmdStatus.UpdateFromPayload(event.Payload)
 		if parseErr == nil {
 			//fmt.Printf("Parsed command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
-			if cmdCode == l.srcCmd.CommandCode {
+			if cmdStatus.CmdCode == l.srcCmd.CommandCode {  //ToDo: remove, already checked by filter
 				//fmt.Println("... CommandCode matches, cancelling listener")
 				// set correct error value (read by WaitResult)
-				if statusErr, exists := CmdStatusErrorMap[state]; exists {
+				if statusErr, exists := CmdStatusErrorMap[cmdStatus.Status]; exists {
 					l.resErr = statusErr
 				} else {
 					l.resErr = ErrUnknownCommandStatus
@@ -83,15 +86,17 @@ func (l *defaultCmdEvtListener) Handle(event Event) (finished bool) {
 			}
 		}
 	case EVT_COMMAND_COMPLETE:
-		cmdCode, state, resultParams, parseErr := parseEvtCmdComplete(event.Payload)
+		//cmdCode, state, resultParams, parseErr := parseEvtCmdComplete(event.Payload)
+		cmdComplete := &CommandCompleteEvent{}
+		parseErr := cmdComplete.UpdateFromPayload(event.Payload)
 		if parseErr == nil {
-			//fmt.Printf("Parsed CommandComplete Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
-			if cmdCode == l.srcCmd.CommandCode {
+			//fmt.Printf("Parsed CommandCompleteEvent Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
+			if cmdComplete.CmdCode == l.srcCmd.CommandCode { //ToDo: remove, already checked by filter
 				//fmt.Println("... CommandCode matches, cancelling listener")
 				// set correct error value and result params (read by WaitResult)
-				if statusErr, exists := CmdStatusErrorMap[state]; exists {
+				if statusErr, exists := CmdStatusErrorMap[cmdComplete.Status]; exists {
 					l.resErr = statusErr
-					l.resParam = resultParams
+					l.resParam = cmdComplete.ReturnParams
 				} else {
 					l.resErr = ErrUnknownCommandStatus
 				}

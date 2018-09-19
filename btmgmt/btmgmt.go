@@ -58,6 +58,8 @@ func runGlobalMgmtConnection() (err error) {
 type BtMgmt struct {
 }
 
+
+
 func (bm BtMgmt) ReadManagementVersionInformation() (res *VersionInformation, err error)  {
 	payload,err := globalMgmtConn.RunCmd(INDEX_CONTROLLER_NONE, CMD_READ_MANAGEMENT_VERSION_INFORMATION)
 	if err != nil { return }

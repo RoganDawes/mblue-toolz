@@ -6,17 +6,8 @@ import (
 	"net"
 )
 
+/*
 // ToDo: Convert these two parsers to interface format
-func parseEvtCmdComplete(payload []byte) (cmd CmdCode, status CmdStatus, retParams []byte, err error) {
-	if len(payload) < 3 {
-		err = ErrPayloadFormat
-		return
-	}
-	cmd = CmdCode(binary.LittleEndian.Uint16(payload[0:2]))
-	status = CmdStatus(payload[2])
-	retParams = payload[3:]
-	return
-}
 
 func parseEvtCmdStatus(payload []byte) (cmd CmdCode, status CmdStatus, err error) {
 	if len(payload) != 3 {
@@ -27,11 +18,41 @@ func parseEvtCmdStatus(payload []byte) (cmd CmdCode, status CmdStatus, err error
 	status = CmdStatus(payload[2])
 	return
 }
+*/
 
 /* Parsers */
 
 type ParsePayload interface {
 	UpdateFromPayload(pay []byte) (err error)
+}
+
+type CommandStatusEvent struct {
+	CmdCode CmdCode
+	Status  CmdStatus
+}
+
+func (cs *CommandStatusEvent) UpdateFromPayload(payload []byte) (err error) {
+	if len(payload) != 3 { //exact 3, in contrast to command complete
+		return ErrPayloadFormat
+	}
+	cs.CmdCode = CmdCode(binary.LittleEndian.Uint16(payload[0:2]))
+	cs.Status = CmdStatus(payload[2])
+	return
+}
+type CommandCompleteEvent struct {
+	CmdCode CmdCode
+	Status  CmdStatus
+	ReturnParams []byte
+}
+
+func (cc *CommandCompleteEvent) UpdateFromPayload(payload []byte) (err error) {
+	if len(payload) < 3 {
+		return ErrPayloadFormat
+	}
+	cc.CmdCode = CmdCode(binary.LittleEndian.Uint16(payload[0:2]))
+	cc.Status = CmdStatus(payload[2])
+	cc.ReturnParams = payload[3:]
+	return
 }
 
 type ControllerInformation struct {
@@ -56,8 +77,8 @@ func (ci *ControllerInformation) UpdateFromPayload(p []byte) (err error) {
 	ci.SupportedSettings.UpdateFromPayload(p[9:13])
 	ci.CurrentSettings.UpdateFromPayload(p[13:17])
 	ci.ClassOfDevice.UpdateFromPayload(p[17:20])
-	fmt.Println("PARSE CI: ", p)
-	fmt.Println("PAY LEN: ", len(p))
+	ci.Name = string(zeroTerminateSlice(p[20:269]))
+	ci.ShortName = string(zeroTerminateSlice(p[269:]))
 	return
 }
 
@@ -65,6 +86,7 @@ func (ci ControllerInformation) String() string {
 	res := fmt.Sprintf("addr %s version %d manufacturer %d class %s", ci.Address.String(), ci.BluetoothVersion, ci.Manufacturer, ci.ClassOfDevice.String())
 	res += fmt.Sprintf("\nSupported settings: %+v", ci.SupportedSettings)
 	res += fmt.Sprintf("\nCurrentSettings:    %+v", ci.CurrentSettings)
+	res += fmt.Sprintf("\nname %s short name %s", ci.Name, ci.ShortName)
 	return res
 }
 
@@ -101,6 +123,7 @@ func (a *Address) UpdateFromPayload(pay []byte) (err error) {
 	return
 }
 
+// ToDo: Stringer interface for ControllerSettings (needs map)
 type ControllerSettings struct {
 	Powered                 bool
 	Connectable             bool

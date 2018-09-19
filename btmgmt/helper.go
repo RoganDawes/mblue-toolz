@@ -9,6 +9,15 @@ func copyReverse(src []byte) []byte {
 	return dst
 }
 
+func zeroTerminateSlice(src []byte) []byte {
+	for idx,v := range src {
+		if v == 0 {
+			return src[:idx]
+		}
+	}
+	return src
+}
+
 func testBit(in byte, n uint8) bool {
 	return in&(1<<n) > 0
 }
