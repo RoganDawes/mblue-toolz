@@ -32,7 +32,7 @@ func main() {
 	fmt.Printf("Alias res: %+v %+v\n", alias, err)
 
 	class,err := a.GetClass()
-	fmt.Printf("Class res: %+v %+v\n", class, err)
+	fmt.Printf("DeviceClass res: %+v %+v\n", class, err)
 
 	powered,err := a.GetPowered()
 	fmt.Printf("Powered res: %+v %+v\n", powered, err)
@@ -85,14 +85,35 @@ func main() {
 
 	// ToDo: Generic EventListener (not only listening to command responses) --> ListenForEvID(eventID EvtCode, callback func(event Event, cancel mutexCancelFunc))
 	fmt.Println("Run command ...")
-	cmdRes,cmdErr := mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
+
+	cmdRes,cmdErr := mgmt.RunCmd(0, btmgmt.CMD_SET_POWERED, 0)
 	fmt.Printf("!!RESULT command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
-	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.CMD_READ_MANAGEMENT_VERSION_INFORMATION)
+	cmdRes,cmdErr = mgmt.RunCmd(0, btmgmt.CMD_SET_SIMPLE_SECURE_PAIRING, 0)
 	fmt.Printf("!!RESULT command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
-	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
+	cmdRes,cmdErr = mgmt.RunCmd(0, btmgmt.CMD_SET_POWERED, 1)
 	fmt.Printf("!!RESULT command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
-	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.CMD_READ_MANAGEMENT_VERSION_INFORMATION)
-	fmt.Printf("!!RESULT command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+
+
+	BtMgmt,err := btmgmt.NewBtMgmt()
+	vi,err := BtMgmt.ReadManagementVersionInformation()
+	fmt.Printf("Btmgmt.ReadManagementVersionInformation: %v ERR: %v\n", vi, err)
+	sc,err := BtMgmt.ReadManagementSupportedCommands()
+	fmt.Printf("Btmgmt.ReadManagementSupportedCommands: %v ERR: %v\n", sc, err)
+	cl,err := BtMgmt.ReadControllerIndexList()
+	fmt.Printf("Btmgmt.ReadControllerIndexList: %v ERR: %v\n", cl, err)
+	if err == nil {
+		for _,controllerIndex := range cl.Indices {
+			ctlInfo,err := BtMgmt.ReadControllerInformationCommand(controllerIndex)
+			if err != nil {
+				fmt.Printf("Error retrieving controller info for controller %d: %v\n", controllerIndex, err)
+			} else {
+				fmt.Printf("Controller info for controller: %d\n", controllerIndex)
+				fmt.Println("====================================")
+				fmt.Println(ctlInfo)
+			}
+		}
+	}
+
 
 	fmt.Println("SOCK TEST END\n===============")
 	/*

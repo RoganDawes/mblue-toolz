@@ -95,7 +95,7 @@ const (
 	CMD_READ_MANAGEMENT_VERSION_INFORMATION CmdCode = 0x01
 	CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS  CmdCode = 0x02
 	CMD_READ_CONTROLLER_INDEX_LIST          CmdCode = 0x03
-	CMD_READ_CONTROLLER_INFO                CmdCode = 0x04
+	CMD_READ_CONTROLLER_INFORMATION         CmdCode = 0x04
 	CMD_SET_POWERED                         CmdCode = 0x05
 	CMD_SET_DISCOVERABLE                    CmdCode = 0x06
 	CMD_SET_CONNECTABLE                     CmdCode = 0x07
@@ -237,46 +237,3 @@ func genCmdStatusErrorMap() (eMap map[CmdStatus]error) {
 	return eMap
 }
 
-type ControllerSettings struct {
-	Powered                 bool
-	Connectable             bool
-	FastConnectable         bool
-	Discoverable            bool
-	Bondable                bool
-	LinkLevelSecurity       bool
-	SecureSimplePairing     bool
-	BrEdr                   bool
-	HighSpeed               bool
-	LowEnergy               bool
-	Advertising             bool
-	SecureConnections       bool
-	DebugKeys               bool
-	Privacy                 bool
-	ControllerConfiguration bool
-	StaticAddress           bool
-}
-
-func (cd *ControllerSettings) Update(bitfield []byte) error {
-	// only the first byte is relevant, as data arrives in BE
-	if len(bitfield) < 1 {
-		return errors.New("Couldn't parse controller settings")
-	}
-	b := bitfield[0]
-	cd.Powered = testBit(b, 0)
-	cd.Connectable = testBit(b, 1)
-	cd.FastConnectable = testBit(b, 2)
-	cd.Discoverable = testBit(b, 3)
-	cd.Bondable = testBit(b, 4)
-	cd.LinkLevelSecurity = testBit(b, 5)
-	cd.SecureSimplePairing = testBit(b, 6)
-	cd.BrEdr = testBit(b, 7)
-	cd.HighSpeed = testBit(b, 8)
-	cd.LowEnergy = testBit(b, 9)
-	cd.Advertising = testBit(b, 10)
-	cd.SecureConnections = testBit(b, 11)
-	cd.DebugKeys = testBit(b, 12)
-	cd.Privacy = testBit(b, 13)
-	cd.ControllerConfiguration = testBit(b, 14)
-	cd.StaticAddress = testBit(b, 15)
-	return nil
-}
