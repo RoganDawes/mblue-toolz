@@ -7,7 +7,7 @@ import (
 )
 
 type Event struct {
-	EventCode     BtMgmtEvtCode
+	EventCode     EvtCode
 	ControllerIdx uint16
 	ParamLen      uint16
 	Payload       []byte
@@ -18,10 +18,10 @@ type EventListener interface {
 	Handle(event Event) (listenerFinished bool)
 }
 
-type DefaultCmdEvtListener struct {
+type defaultCmdEvtListener struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	srcCmd Command // the command
+	srcCmd command // the command
 
 	isDone bool
 
@@ -29,7 +29,7 @@ type DefaultCmdEvtListener struct {
 	resErr   error
 }
 
-func (l *DefaultCmdEvtListener) Filter(event Event) (consume bool) {
+func (l *defaultCmdEvtListener) Filter(event Event) (consume bool) {
 	if l.isDone { return true } // send ANY event to handler(), in order to assure the handler can indicate that the listener has finished
 
 	// check if event is for same controller as the command
@@ -40,9 +40,9 @@ func (l *DefaultCmdEvtListener) Filter(event Event) (consume bool) {
 
 	switch event.EventCode {
 	case EVT_COMMAND_STATUS:
-		cmdCode, _, parseErr := ParseEvtCmdStatus(event.Payload)
+		cmdCode, _, parseErr := parseEvtCmdStatus(event.Payload)
 		if parseErr == nil {
-			//fmt.Printf("Parsed Command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
+			//fmt.Printf("Parsed command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
 			if cmdCode == l.srcCmd.CommandCode {
 				return true
 			} // ignore events with wrong cmdCode
@@ -62,14 +62,14 @@ func (l *DefaultCmdEvtListener) Filter(event Event) (consume bool) {
 	return false
 }
 
-func (l *DefaultCmdEvtListener) Handle(event Event) (finished bool) {
+func (l *defaultCmdEvtListener) Handle(event Event) (finished bool) {
 	if l.isDone { return true } // indicate handle is finished
 
 	switch event.EventCode {
 	case EVT_COMMAND_STATUS:
-		cmdCode, state, parseErr := ParseEvtCmdStatus(event.Payload)
+		cmdCode, state, parseErr := parseEvtCmdStatus(event.Payload)
 		if parseErr == nil {
-			//fmt.Printf("Parsed Command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
+			//fmt.Printf("Parsed command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
 			if cmdCode == l.srcCmd.CommandCode {
 				//fmt.Println("... CommandCode matches, cancelling listener")
 				// set correct error value (read by WaitResult)
@@ -105,12 +105,12 @@ func (l *DefaultCmdEvtListener) Handle(event Event) (finished bool) {
 	return false
 }
 
-func (l *DefaultCmdEvtListener) SetDone() {
+func (l *defaultCmdEvtListener) SetDone() {
 	l.isDone = true
 	l.cancel()
 }
 
-func (l *DefaultCmdEvtListener) WaitResult(timeout time.Duration) (*[]byte, error) {
+func (l *defaultCmdEvtListener) WaitResult(timeout time.Duration) (*[]byte, error) {
 	timeoutCtx, cancelWait := context.WithTimeout(context.Background(), timeout)
 	select {
 	case <-timeoutCtx.Done():
@@ -130,9 +130,9 @@ func (l *DefaultCmdEvtListener) WaitResult(timeout time.Duration) (*[]byte, erro
 	return l.resParam, l.resErr
 }
 
-func NewDefaultCmdEvtListener(srcCmd Command) (cmdResultListener *DefaultCmdEvtListener) {
+func newDefaultCmdEvtListener(srcCmd command) (cmdResultListener *defaultCmdEvtListener) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cmdResultListener = &DefaultCmdEvtListener{
+	cmdResultListener = &defaultCmdEvtListener{
 		ctx:    ctx,
 		cancel: cancel,
 		srcCmd: srcCmd,
@@ -147,7 +147,7 @@ func parseEvt(evt_packet []byte) (evt *Event, err error) {
 
 	// ToDo: Error check
 	evt = &Event{
-		EventCode:     BtMgmtEvtCode(binary.LittleEndian.Uint16(evt_packet[0:2])),
+		EventCode:     EvtCode(binary.LittleEndian.Uint16(evt_packet[0:2])),
 		ControllerIdx: binary.LittleEndian.Uint16(evt_packet[2:4]),
 		ParamLen:      binary.LittleEndian.Uint16(evt_packet[4:6]),
 		Payload:       evt_packet[6:],

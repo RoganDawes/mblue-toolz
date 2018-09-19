@@ -75,22 +75,24 @@ func main() {
 	 */
 	fmt.Println("SOCK TEST\n===============")
 
+
+
 	mgmt,err := btmgmt.NewMgmtConnection()
 	fmt.Printf("NewMgmtConnection: %+v\n", err)
 
 	// ToDo: proper errors on disconnect + check if loops are stopped and all channel closed (avoid memory leaks)
-	//mgmt.Disconnect()
+	//mgmt.Close()
 
-	// ToDo: Generic EventListener (not only listening to command responses) --> ListenForEvID(eventID BtMgmtEvtCode, callback func(event MgmtEvent, cancel mutexCancelFunc))
+	// ToDo: Generic EventListener (not only listening to command responses) --> ListenForEvID(eventID EvtCode, callback func(event Event, cancel mutexCancelFunc))
 	fmt.Println("Run command ...")
-	cmdRes,cmdErr := mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
-	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
-	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_VERSION_INFORMATION)
-	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
-	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
-	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
-	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_VERSION_INFORMATION)
-	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+	cmdRes,cmdErr := mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
+	fmt.Printf("!!RESULT command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.CMD_READ_MANAGEMENT_VERSION_INFORMATION)
+	fmt.Printf("!!RESULT command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
+	fmt.Printf("!!RESULT command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.CMD_READ_MANAGEMENT_VERSION_INFORMATION)
+	fmt.Printf("!!RESULT command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
 
 	fmt.Println("SOCK TEST END\n===============")
 	/*
@@ -105,5 +107,5 @@ func main() {
 	si := <-sig
 	fmt.Printf("Signal (%v) received, ending process ...\n", si)
 	// close socket to avoid leaking
-	mgmt.Disconnect()
+	mgmt.Close()
 }

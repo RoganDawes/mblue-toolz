@@ -14,7 +14,7 @@ import (
 // are received on the same socket, as so called events.
 // The whole thing behaves asynchronous, which means other events could arrive
 // on the socket, which aren't directly realted to the command which has been sent.
-// A command result (Command complete or command status event) carries an identifier,
+// A command result (command complete or command status event) carries an identifier,
 // which corresponds to to the command opcode used when sending a command.
 // This design doesn't seem to be save for concurrent usage, because the control socket is globally shared.
 // If, for example, two processes send a SetPowered command (CommandCode 0x05) with different
@@ -183,16 +183,16 @@ func (m *MgmtConnection) eventHandlerLoop() {
 	//fmt.Println("Event handler stopped")
 }
 
-func (m *MgmtConnection) RunCmd(controllerId uint16, cmdCode BtMgmtCmdCode, params ...byte) (resultParsams *[]byte, err error) {
+func (m *MgmtConnection) RunCmd(controllerId uint16, cmdCode CmdCode, params ...byte) (resultParsams *[]byte, err error) {
 	if m.isClosed() { return nil,ErrClosed }
-	command := NewCommand(
+	command := newCommand(
 		cmdCode,
 		controllerId,
 		params...,
 	)
 
 	// created listener for given command
-	commandL := NewDefaultCmdEvtListener(command)
+	commandL := newDefaultCmdEvtListener(command)
 	// register listener for command result
 	m.AddListener(commandL)
 	// send command
@@ -276,7 +276,7 @@ func (m *MgmtConnection) bind() (err error) {
 	return
 }
 
-func (m *MgmtConnection) SendCmd(command Command) (err error) {
+func (m *MgmtConnection) SendCmd(command command) (err error) {
 	if m.isClosed() { return ErrClosed }
 	sendbuf := command.toWire()
 
