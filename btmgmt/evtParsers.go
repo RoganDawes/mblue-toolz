@@ -31,7 +31,7 @@ func parseEvtCmdStatus(payload []byte) (cmd CmdCode, status CmdStatus, err error
 /* Parsers */
 
 type ParsePayload interface {
-	UpdateFromPayload(pay *[]byte) (err error)
+	UpdateFromPayload(pay []byte) (err error)
 }
 
 type ControllerInformation struct {
@@ -45,27 +45,19 @@ type ControllerInformation struct {
 	ShortName         string      //[11]byte, 0x00 terminated
 }
 
-func (ci *ControllerInformation) UpdateFromPayload(pay *[]byte) (err error) {
-	if pay == nil {
-		return ErrPayloadFormat
-	}
-	p := *pay
+func (ci *ControllerInformation) UpdateFromPayload(p []byte) (err error) {
 	if len(p) != 280 {
 		return ErrPayloadFormat
 	}
 
-	addrBytes := p[0:6]
-	supSetBytes := p[9:13]
-	curSetBytes := p[13:17]
-	class := p[17:20]
-	ci.Address.UpdateFromPayload(&addrBytes)
+	ci.Address.UpdateFromPayload(p[0:6])
 	ci.BluetoothVersion = p[6]
 	ci.Manufacturer = binary.LittleEndian.Uint16(p[7:9])
-	ci.SupportedSettings.UpdateFromPayload(&supSetBytes)
-	ci.CurrentSettings.UpdateFromPayload(&curSetBytes)
-	ci.ClassOfDevice.UpdateFromPayload(&class)
-	fmt.Println("PARSE CI: ", pay)
-	fmt.Println("PAY LEN: ", len(*pay))
+	ci.SupportedSettings.UpdateFromPayload(p[9:13])
+	ci.CurrentSettings.UpdateFromPayload(p[13:17])
+	ci.ClassOfDevice.UpdateFromPayload(p[17:20])
+	fmt.Println("PARSE CI: ", p)
+	fmt.Println("PAY LEN: ", len(p))
 	return
 }
 
@@ -84,14 +76,11 @@ func (c *DeviceClass) String() string {
 	return fmt.Sprintf("0x%.2x%.2x%.2x", c.Octets[0], c.Octets[1], c.Octets[2])
 }
 
-func (c *DeviceClass) UpdateFromPayload(pay *[]byte) (err error) {
-	if pay == nil {
+func (c *DeviceClass) UpdateFromPayload(pay []byte) (err error) {
+	if len(pay) != 3 {
 		return ErrPayloadFormat
 	}
-	if len(*pay) != 3 {
-		return ErrPayloadFormat
-	}
-	c.Octets = copyReverse(*pay)
+	c.Octets = copyReverse(pay)
 	return
 }
 
@@ -103,14 +92,11 @@ func (a *Address) String() string {
 	return a.Addr.String()
 }
 
-func (a *Address) UpdateFromPayload(pay *[]byte) (err error) {
-	if pay == nil {
+func (a *Address) UpdateFromPayload(pay []byte) (err error) {
+	if len(pay) != 6 {
 		return ErrPayloadFormat
 	}
-	if len(*pay) != 6 {
-		return ErrPayloadFormat
-	}
-	p := copyReverse(*pay)
+	p := copyReverse(pay)
 	a.Addr = net.HardwareAddr(p)
 	return
 }
@@ -134,14 +120,11 @@ type ControllerSettings struct {
 	StaticAddress           bool
 }
 
-func (cd *ControllerSettings) UpdateFromPayload(pay *[]byte) (err error) {
-	if pay == nil {
+func (cd *ControllerSettings) UpdateFromPayload(pay []byte) (err error) {
+	if len(pay) < 1 {
 		return ErrPayloadFormat
 	}
-	if len(*pay) < 1 {
-		return ErrPayloadFormat
-	}
-	b := (*pay)[0]
+	b := (pay)[0]
 	cd.Powered = testBit(b, 0)
 	cd.Connectable = testBit(b, 1)
 	cd.FastConnectable = testBit(b, 2)
@@ -173,11 +156,7 @@ func (cil *ControllerIndexList) String() string {
 	return res
 }
 
-func (cil *ControllerIndexList) UpdateFromPayload(pay *[]byte) (err error) {
-	if pay == nil {
-		return ErrPayloadFormat
-	}
-	p := *pay
+func (cil *ControllerIndexList) UpdateFromPayload(p []byte) (err error) {
 	if len(p) < 2 {
 		return ErrPayloadFormat
 	}
@@ -208,11 +187,7 @@ func (sc *SupportedCommands) String() string {
 	return res
 }
 
-func (sc *SupportedCommands) UpdateFromPayload(pay *[]byte) (err error) {
-	if pay == nil {
-		return ErrPayloadFormat
-	}
-	p := *pay
+func (sc *SupportedCommands) UpdateFromPayload(p []byte) (err error) {
 	if len(p) < 4 {
 		return ErrPayloadFormat
 	}
@@ -239,11 +214,7 @@ type VersionInformation struct {
 	Revision uint16
 }
 
-func (v *VersionInformation) UpdateFromPayload(payload *[]byte) (err error) {
-	if payload == nil {
-		return ErrPayloadFormat
-	}
-	pay := *payload
+func (v *VersionInformation) UpdateFromPayload(pay []byte) (err error) {
 	if len(pay) != 3 {
 		return ErrPayloadFormat
 	}

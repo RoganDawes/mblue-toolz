@@ -25,7 +25,7 @@ type defaultCmdEvtListener struct {
 
 	isDone bool
 
-	resParam *[]byte
+	resParam []byte
 	resErr   error
 }
 
@@ -91,7 +91,7 @@ func (l *defaultCmdEvtListener) Handle(event Event) (finished bool) {
 				// set correct error value and result params (read by WaitResult)
 				if statusErr, exists := CmdStatusErrorMap[state]; exists {
 					l.resErr = statusErr
-					l.resParam = &resultParams
+					l.resParam = resultParams
 				} else {
 					l.resErr = ErrUnknownCommandStatus
 				}
@@ -110,7 +110,7 @@ func (l *defaultCmdEvtListener) SetDone() {
 	l.cancel()
 }
 
-func (l *defaultCmdEvtListener) WaitResult(timeout time.Duration) (*[]byte, error) {
+func (l *defaultCmdEvtListener) WaitResult(timeout time.Duration) ([]byte, error) {
 	timeoutCtx, cancelWait := context.WithTimeout(context.Background(), timeout)
 	select {
 	case <-timeoutCtx.Done():

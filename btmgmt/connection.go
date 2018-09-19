@@ -185,7 +185,7 @@ func (m *MgmtConnection) eventHandlerLoop() {
 	//fmt.Println("Event handler stopped")
 }
 
-func (m *MgmtConnection) RunCmd(controllerId uint16, cmdCode CmdCode, params ...byte) (resultParsams *[]byte, err error) {
+func (m *MgmtConnection) RunCmd(controllerId uint16, cmdCode CmdCode, params ...byte) (resultParsams []byte, err error) {
 	if m.isClosed() { return nil,ErrClosed }
 	command := newCommand(
 		cmdCode,
