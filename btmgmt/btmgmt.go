@@ -1,8 +1,6 @@
 package btmgmt
 
 import (
-	"encoding/binary"
-	"errors"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"sync"
@@ -26,14 +24,6 @@ import (
 //
 // Misbehaviour only seems to be avoidable, if the socket is used exclusively (e.g. no other bluetooth service running)
 
-const INDEX_CONTROLLER_NONE = uint16(0xFFFF) //https://elixir.bootlin.com/linux/v3.7/source/include/net/bluetooth/hci.h#L1457
-
-var (
-	ErrSocketOpen         = errors.New("Opening socket failed")
-	ErrSocketBind         = errors.New("Binding socket failed")
-	ErrSocketNotConnected = errors.New("BtSocket not connected")
-	ErrRdLoop             = errors.New("BtSocket error in event read loop")
-)
 
 type MgmtConnection struct {
 	*sync.Mutex
@@ -52,8 +42,8 @@ type MgmtConnection struct {
 }
 
 
-func NewMgmtConnection() (res *MgmtConnection, err error) {
-	res = &MgmtConnection{
+func NewMgmtConnection() (mgmtConn *MgmtConnection, err error) {
+	mgmtConn = &MgmtConnection{
 		Mutex:       &sync.Mutex{},
 		rMutex:      &sync.Mutex{},
 		wMutex:      &sync.Mutex{},
@@ -70,38 +60,45 @@ func NewMgmtConnection() (res *MgmtConnection, err error) {
 		removeListener:        make(chan EventListener),
 		registeredListeners:   make(map[EventListener]bool),
 	}
-	err = res.Connect()
+	err = mgmtConn.Connect()
 	if err != nil {
 		return nil, err
 	}
-	err = res.bind()
+	err = mgmtConn.bind()
 	if err != nil {
-		res.Disconnect()
+		mgmtConn.Close()
 		return nil, err
 	}
-	go res.socketReaderLoop() // converts []byte received via blocking io to blocking channel data
-	go res.eventHandlerLoop() // handles events based on channels
-	return res, nil
+	go mgmtConn.socketReaderLoop() // converts []byte received via blocking io to blocking channel data
+	go mgmtConn.eventHandlerLoop() // handles events based on channels
+	return mgmtConn, nil
 }
 
-func (m *MgmtConnection) AddListener(l EventListener) {
+func (m *MgmtConnection) AddListener(l EventListener) error {
+	if m.isClosed() { return ErrClosed }
 	//fmt.Println("Listener marked for addition")
 	m.addListener <- l
+	return nil
 }
 
+/*
+// Listeners are removed if the Handler returns true
 func (m *MgmtConnection) RemoveListener(l EventListener) {
 	//fmt.Printf("Listener marked for remove: %v\n", l)
 	m.removeListener <- l
 }
+*/
 
 func (m *MgmtConnection) socketReaderLoop() {
 	//fmt.Println("Readloop started")
 	rcvBuf := make([]byte, 1024)
 	for {
+		//fmt.Println("READER LOOP")
+
 		n, err := m.Read(rcvBuf)
 		if err != nil || n == 0 {
-			m.Disconnect()
-			fmt.Println("Error reading from socket")
+			m.Close()
+			//fmt.Println("Error reading from socket")
 			break
 		}
 		evtPacket := make([]byte, n)
@@ -128,6 +125,7 @@ func (m *MgmtConnection) eventHandlerLoop() {
 
 	Outer:
 	for {
+		//fmt.Println("EV HANDLER LOOP")
 		select {
 		case <-m.abortEventHandlerLoop:
 			//fmt.Println("Event Handler aborted")
@@ -140,7 +138,7 @@ func (m *MgmtConnection) eventHandlerLoop() {
 					break fl // if no elem although length was tested (other consumer), abort outer for loop
 				}
 			}
-			break
+			break Outer
 		case evtPacket := <-m.newRawPacket:
 			// handle received packet
 			evt, eErr := parseEvt(evtPacket)
@@ -182,11 +180,12 @@ func (m *MgmtConnection) eventHandlerLoop() {
 			m.mutexListeners.Unlock()
 		}
 	}
-	fmt.Println("Event handler stopped")
+	//fmt.Println("Event handler stopped")
 }
 
 func (m *MgmtConnection) RunCmd(controllerId uint16, cmdCode BtMgmtCmdCode, params ...byte) (resultParsams *[]byte, err error) {
-	command := NewMgmtCmd(
+	if m.isClosed() { return nil,ErrClosed }
+	command := NewCommand(
 		cmdCode,
 		controllerId,
 		params...,
@@ -203,38 +202,9 @@ func (m *MgmtConnection) RunCmd(controllerId uint16, cmdCode BtMgmtCmdCode, para
 }
 
 
-/*
-func (m *MgmtConnection) dispatchEvent(ev *MgmtEvent) {
-
-	switch ev.EventCode {
-	case BT_MGMT_EVT_COMMAND_STATUS:
-		cmd, state, perr := ParseEvtCmdStatus(ev.Payload)
-		if perr == nil {
-			fmt.Printf("Parsed Command Status Event: command: %v satus: %v\n", cmd, state)
-		} else {
-			fmt.Printf("Error parsing command status event: %v\n", perr)
-		}
-	case BT_MGMT_EVT_COMMAND_COMPLETE:
-		cmd, state, result, perr := ParseEvtCmdComplete(ev.Payload)
-		if perr == nil {
-			fmt.Printf("Parsed Command Complete Event: - command: %v satus: %v result: %+v\n", cmd, state, result)
-		} else {
-			fmt.Printf("Error parsing command complete event: %v\n", perr)
-		}
-	case BT_MGMT_EVT_NEW_SETTINGS:
-		if s, err := ParseEvtNewSettings(ev.Payload); err == nil {
-			fmt.Printf("NewSettings event: %+v\n", s)
-		} else {
-			fmt.Println("Error parsing new settings event")
-		}
-	default:
-		fmt.Printf("Received event: %v\n", ev)
-	}
-
-}
-*/
 
 func (m *MgmtConnection) Read(p []byte) (n int, err error) {
+	if m.isClosed() { return 0,ErrClosed }
 	m.rMutex.Lock()
 	defer m.rMutex.Unlock()
 	if !m.isBound {
@@ -244,6 +214,7 @@ func (m *MgmtConnection) Read(p []byte) (n int, err error) {
 }
 
 func (m *MgmtConnection) Write(p []byte) (n int, err error) {
+	if m.isClosed() { return 0,ErrClosed }
 	m.wMutex.Lock()
 	defer m.wMutex.Unlock()
 	if !m.isBound {
@@ -252,8 +223,31 @@ func (m *MgmtConnection) Write(p []byte) (n int, err error) {
 	return unix.Write(m.socket_fd, p)
 }
 
-func (m *MgmtConnection) Close() error {
-	return m.Disconnect()
+func (m *MgmtConnection) isClosed() bool {
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
+	return !m.isConnected
+}
+
+func (m *MgmtConnection) Close() (err error) {
+	if m.isClosed() { return }
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
+	if m.isConnected {
+		err = unix.Close(m.socket_fd)
+		if err != nil {
+			return ErrSockClose
+		}
+	}
+	m.isConnected = false
+	m.isBound = false
+	close(m.abortEventHandlerLoop)
+	close(m.newRawPacket)
+	close(m.addListener)
+	close(m.removeListener)
+
+	return
+
 }
 
 func (m *MgmtConnection) Connect() (err error) {
@@ -282,7 +276,8 @@ func (m *MgmtConnection) bind() (err error) {
 	return
 }
 
-func (m *MgmtConnection) SendCmd(command MgmtCommand) (err error) {
+func (m *MgmtConnection) SendCmd(command Command) (err error) {
+	if m.isClosed() { return ErrClosed }
 	sendbuf := command.toWire()
 
 	lenBuff := len(sendbuf)
@@ -300,72 +295,4 @@ func (m *MgmtConnection) SendCmd(command MgmtCommand) (err error) {
 	return nil
 
 }
-
-func (m *MgmtConnection) ReadBytes(count int) (res *[]byte, err error) {
-	m.rMutex.Lock()
-	defer m.rMutex.Unlock()
-	if !m.isBound {
-		return nil, ErrSocketNotConnected
-	}
-	readen := make([]byte, count)
-	for off := 0; off < len(readen); {
-		n, err := unix.Read(m.socket_fd, readen[off:])
-		if err != nil {
-			return nil, err
-		}
-		off += n
-	}
-	return &readen, nil
-}
-
-/*
-func (m *MgmtConnection) ReadEvt() (hdr *MgmtEvent, err error) {
-	rawHdr, err := m.ReadBytes(6)
-	if err != nil {
-		return nil, ErrEvtRdHdr
-	}
-	hdr = &MgmtEvent{
-		EventCode:     BtMgmtEvtCode(binary.LittleEndian.Uint16((*rawHdr)[0:2])),
-		ControllerIdx: binary.LittleEndian.Uint16((*rawHdr)[2:4]),
-		ParamLen:      binary.LittleEndian.Uint16((*rawHdr)[4:6]),
-	}
-
-	//Read payload bytes
-	payBytes, err := m.ReadBytes(int(hdr.ParamLen))
-	if err != nil {
-		return nil, ErrEvtRdPayload
-	}
-	hdr.Payload = *payBytes
-
-	return hdr, nil
-}
-*/
-
-func parseEvt(evt_packet []byte) (evt *MgmtEvent, err error) {
-	// ToDo: Error check
-	evt = &MgmtEvent{
-		EventCode:     BtMgmtEvtCode(binary.LittleEndian.Uint16(evt_packet[0:2])),
-		ControllerIdx: binary.LittleEndian.Uint16(evt_packet[2:4]),
-		ParamLen:      binary.LittleEndian.Uint16(evt_packet[4:6]),
-		Payload:       evt_packet[6:],
-	}
-
-	return evt, nil
-}
-
-func (m *MgmtConnection) Disconnect() (err error) {
-	m.Mutex.Lock()
-	defer m.Mutex.Unlock()
-	if m.isConnected {
-		err = unix.Close(m.socket_fd)
-		if err != nil {
-			return errors.New(fmt.Sprintf("Error closing socket: %v", err))
-		}
-	}
-	m.isConnected = false
-	m.isBound = false
-	close(m.abortEventHandlerLoop)
-	return
-}
-
 

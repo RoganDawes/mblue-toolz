@@ -2,17 +2,11 @@ package btmgmt
 
 import (
 	"context"
-	"errors"
+	"encoding/binary"
 	"time"
 )
 
-var (
-	ErrEvtRdHdr     = errors.New("BtSocket not able to read event header")
-	ErrEvtParseHdr  = errors.New("BtSocket not able to parse event header")
-	ErrEvtRdPayload = errors.New("BtSocket not able to read event payload")
-)
-
-type MgmtEvent struct {
+type Event struct {
 	EventCode     BtMgmtEvtCode
 	ControllerIdx uint16
 	ParamLen      uint16
@@ -20,14 +14,14 @@ type MgmtEvent struct {
 }
 
 type EventListener interface {
-	Filter(event MgmtEvent) bool
-	Handle(event MgmtEvent) (finished bool)
+	Filter(event Event) (consumeEvent bool)
+	Handle(event Event) (listenerFinished bool)
 }
 
 type DefaultCmdEvtListener struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	srcCmd MgmtCommand // the command
+	srcCmd Command // the command
 
 	isDone bool
 
@@ -35,8 +29,8 @@ type DefaultCmdEvtListener struct {
 	resErr   error
 }
 
-func (l *DefaultCmdEvtListener) Filter(event MgmtEvent) bool {
-	if l.isDone { return false } // ignore events when done
+func (l *DefaultCmdEvtListener) Filter(event Event) (consume bool) {
+	if l.isDone { return true } // send ANY event to handler(), in order to assure the handler can indicate that the listener has finished
 
 	// check if event is for same controller as the command
 	//fmt.Printf("Default command listener received Event: %+v\n", event)
@@ -45,7 +39,7 @@ func (l *DefaultCmdEvtListener) Filter(event MgmtEvent) bool {
 	}
 
 	switch event.EventCode {
-	case BT_MGMT_EVT_COMMAND_STATUS:
+	case EVT_COMMAND_STATUS:
 		cmdCode, _, parseErr := ParseEvtCmdStatus(event.Payload)
 		if parseErr == nil {
 			//fmt.Printf("Parsed Command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
@@ -53,8 +47,8 @@ func (l *DefaultCmdEvtListener) Filter(event MgmtEvent) bool {
 				return true
 			} // ignore events with wrong cmdCode
 		} //Ignore CommandStatus events which couldn't be parsed
-	case BT_MGMT_EVT_COMMAND_COMPLETE:
-		cmdCode, _, _, parseErr := ParseEvtCmdComplete(event.Payload)
+	case EVT_COMMAND_COMPLETE:
+		cmdCode, _, _, parseErr := parseEvtCmdComplete(event.Payload)
 		if parseErr == nil {
 			//fmt.Printf("Parsed CommandComplete Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
 			if cmdCode == l.srcCmd.CommandCode {
@@ -68,11 +62,11 @@ func (l *DefaultCmdEvtListener) Filter(event MgmtEvent) bool {
 	return false
 }
 
-func (l *DefaultCmdEvtListener) Handle(event MgmtEvent) (finished bool) {
+func (l *DefaultCmdEvtListener) Handle(event Event) (finished bool) {
 	if l.isDone { return true } // indicate handle is finished
 
 	switch event.EventCode {
-	case BT_MGMT_EVT_COMMAND_STATUS:
+	case EVT_COMMAND_STATUS:
 		cmdCode, state, parseErr := ParseEvtCmdStatus(event.Payload)
 		if parseErr == nil {
 			//fmt.Printf("Parsed Command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
@@ -82,14 +76,14 @@ func (l *DefaultCmdEvtListener) Handle(event MgmtEvent) (finished bool) {
 				if statusErr, exists := CmdStatusErrorMap[state]; exists {
 					l.resErr = statusErr
 				} else {
-					l.resErr = errors.New("Unknown command status for received event")
+					l.resErr = ErrUnknownCommandStatus
 				}
 				l.cancel()
 				return true // indicate listener could be removed
 			}
 		}
-	case BT_MGMT_EVT_COMMAND_COMPLETE:
-		cmdCode, state, resultParams, parseErr := ParseEvtCmdComplete(event.Payload)
+	case EVT_COMMAND_COMPLETE:
+		cmdCode, state, resultParams, parseErr := parseEvtCmdComplete(event.Payload)
 		if parseErr == nil {
 			//fmt.Printf("Parsed CommandComplete Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
 			if cmdCode == l.srcCmd.CommandCode {
@@ -99,7 +93,7 @@ func (l *DefaultCmdEvtListener) Handle(event MgmtEvent) (finished bool) {
 					l.resErr = statusErr
 					l.resParam = &resultParams
 				} else {
-					l.resErr = errors.New("Unknown command status for received event")
+					l.resErr = ErrUnknownCommandStatus
 				}
 				l.cancel()
 				return true // indicate listener could be removed
@@ -136,7 +130,7 @@ func (l *DefaultCmdEvtListener) WaitResult(timeout time.Duration) (*[]byte, erro
 	return l.resParam, l.resErr
 }
 
-func NewDefaultCmdEvtListener(srcCmd MgmtCommand) (cmdResultListener *DefaultCmdEvtListener) {
+func NewDefaultCmdEvtListener(srcCmd Command) (cmdResultListener *DefaultCmdEvtListener) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cmdResultListener = &DefaultCmdEvtListener{
 		ctx:    ctx,
@@ -147,165 +141,17 @@ func NewDefaultCmdEvtListener(srcCmd MgmtCommand) (cmdResultListener *DefaultCmd
 	return cmdResultListener
 }
 
-/*
-Packet Structures
-=================
 
-Commands:
+func parseEvt(evt_packet []byte) (evt *Event, err error) {
+	if len(evt_packet) < 6 { return nil, ErrPayloadFormat }
 
-0    4    8   12   16   22   24   28   31   35   39   43   47
-+-------------------+-------------------+-------------------+
-|  Command Code     |  Controller Index |  Parameter Length |
-+-------------------+-------------------+-------------------+
-|                                                           |
+	// ToDo: Error check
+	evt = &Event{
+		EventCode:     BtMgmtEvtCode(binary.LittleEndian.Uint16(evt_packet[0:2])),
+		ControllerIdx: binary.LittleEndian.Uint16(evt_packet[2:4]),
+		ParamLen:      binary.LittleEndian.Uint16(evt_packet[4:6]),
+		Payload:       evt_packet[6:],
+	}
 
-Events:
-
-0    4    8   12   16   22   24   28   31   35   39   43   47
-+-------------------+-------------------+-------------------+
-|  Event Code       |  Controller Index |  Parameter Length |
-+-------------------+-------------------+-------------------+
-|                                                           |
-
-All fields are in little-endian byte order (least significant byte first).
-
-Controller Index can have a special value <non-controller> to indicate that
-command or event is not related to any controller. Possible values:
-
-<controller id>		0x0000 to 0xFFFE
-<non-controller>	0xFFFF
-
-
-Error Codes
-===========
-
-The following values have been defined for use with the Command Status
-and Command Complete events:
-
-0x00	Success
-0x01	Unknown Command
-0x02	Not Connected
-0x03	Failed
-0x04	Connect Failed
-0x05	Authentication Failed
-0x06	Not Paired
-0x07	No Resources
-0x08	Timeout
-0x09	Already Connected
-0x0A	Busy
-0x0B	Rejected
-0x0C	Not Supported
-0x0D	Invalid Parameters
-0x0E	Disconnected
-0x0F	Not Powered
-0x10	Cancelled
-0x11	Invalid Index
-0x12	RFKilled
-0x13	Already Paired
-0x14	Permission Denied
-
-As a general rule all commands generate the events as specified below,
-however invalid lengths or unknown commands will always generate a
-Command Status response (with Unknown Command or Invalid Parameters
-status). Sending a command with an invalid Controller Index value will
-also always generate a Command Status event with the Invalid Index
-status code.
-*/
-
-type BtMgmtEvtCode uint16
-
-const (
-	BT_MGMT_EVT_COMMAND_COMPLETE                        BtMgmtEvtCode = 0x01
-	BT_MGMT_EVT_COMMAND_STATUS                          BtMgmtEvtCode = 0x02
-	BT_MGMT_EVT_CONTROLLER_ERROR                        BtMgmtEvtCode = 0x03
-	BT_MGMT_EVT_INDEX_ADDED                             BtMgmtEvtCode = 0x04
-	BT_MGMT_EVT_INDEX_REMOVED                           BtMgmtEvtCode = 0x05
-	BT_MGMT_EVT_NEW_SETTINGS                            BtMgmtEvtCode = 0x06
-	BT_MGMT_EVT_CLASS_OF_DEVICE_CHANGED                 BtMgmtEvtCode = 0x07
-	BT_MGMT_EVT_LOCAL_NAME_CHANGED                      BtMgmtEvtCode = 0x08
-	BT_MGMT_EVT_NEW_LINK_KEY                            BtMgmtEvtCode = 0x09
-	BT_MGMT_EVT_NEW_LONG_TERM_KEY                       BtMgmtEvtCode = 0x0A
-	BT_MGMT_EVT_DEVICE_CONNECTED                        BtMgmtEvtCode = 0x0B
-	BT_MGMT_EVT_DEVICE_DISCONNECTED                     BtMgmtEvtCode = 0x0C
-	BT_MGMT_EVT_CONNECT_FAILED                          BtMgmtEvtCode = 0x0D
-	BT_MGMT_EVT_PIN_CODE_REQUEST                        BtMgmtEvtCode = 0x0E
-	BT_MGMT_EVT_USER_CONFIRMATION_REQUEST               BtMgmtEvtCode = 0x0F
-	BT_MGMT_EVT_USER_PASSKEY_REQUEST                    BtMgmtEvtCode = 0x10
-	BT_MGMT_EVT_AUTHENTICATION_FAILED                   BtMgmtEvtCode = 0x11
-	BT_MGMT_EVT_DEVICE_FOUND                            BtMgmtEvtCode = 0x12
-	BT_MGMT_EVT_DISCOVERING                             BtMgmtEvtCode = 0x13
-	BT_MGMT_EVT_DEVICE_BLOCKED                          BtMgmtEvtCode = 0x14
-	BT_MGMT_EVT_DEVICE_UNBLOCKED                        BtMgmtEvtCode = 0x15
-	BT_MGMT_EVT_DEVICE_UNPAIRED                         BtMgmtEvtCode = 0x16
-	BT_MGMT_EVT_PASSKEY_NOTIFY                          BtMgmtEvtCode = 0x17
-	BT_MGMT_EVT_NEW_IDENTITY_RESOLVING_KEY              BtMgmtEvtCode = 0x18
-	BT_MGMT_EVT_NEW_SIGNATURE_RESOLVING_KEY             BtMgmtEvtCode = 0x19
-	BT_MGMT_EVT_DEVICE_ADDED                            BtMgmtEvtCode = 0x1A
-	BT_MGMT_EVT_DEVICE_REMOVED                          BtMgmtEvtCode = 0x1B
-	BT_MGMT_EVT_NEW_CONNECTION_PARAMETER                BtMgmtEvtCode = 0x1C
-	BT_MGMT_EVT_UNCONFIGURED_INDEX_ADDED                BtMgmtEvtCode = 0x1D
-	BT_MGMT_EVT_UNCONFIGURED_INDEX_REMOVED              BtMgmtEvtCode = 0x1E
-	BT_MGMT_EVT_NEW_CONFIGURATION_OPTIONS               BtMgmtEvtCode = 0x1F
-	BT_MGMT_EVT_EXTENDED_INDEX_ADDED                    BtMgmtEvtCode = 0x20
-	BT_MGMT_EVT_EXTENDED_INDEX_REMOVED                  BtMgmtEvtCode = 0x21
-	BT_MGMT_EVT_LOCAL_OUT_OF_BAND_EXTENDED_DATA_UPDATE  BtMgmtEvtCode = 0x22
-	BT_MGMT_EVT_EXTENDED_ADVERTISING_ADDED              BtMgmtEvtCode = 0x23
-	BT_MGMT_EVT_EXTENDED_ADVERTISING_REMOVED            BtMgmtEvtCode = 0x24
-	BT_MGMT_EVT_EXTENDED_CONTROLLER_INFORMATION_CHANGED BtMgmtEvtCode = 0x25
-	BT_MGMT_EVT_PHY_CONFIGURATION_CHANGED               BtMgmtEvtCode = 0x26
-)
-
-type BtMgmtCmdStatus uint16
-
-const (
-	BT_MGMT_CMD_STATUS_SUCCESS               BtMgmtCmdStatus = 0x00
-	BT_MGMT_CMD_STATUS_UNKNOWN_COMMAND       BtMgmtCmdStatus = 0x01
-	BT_MGMT_CMD_STATUS_NOT_CONNECTED         BtMgmtCmdStatus = 0x02
-	BT_MGMT_CMD_STATUS_FAILED                BtMgmtCmdStatus = 0x03
-	BT_MGMT_CMD_STATUS_CONNECT_FAILED        BtMgmtCmdStatus = 0x04
-	BT_MGMT_CMD_STATUS_AUTHENTICATION_FAILED BtMgmtCmdStatus = 0x05
-	BT_MGMT_CMD_STATUS_NOT_PAIRED            BtMgmtCmdStatus = 0x06
-	BT_MGMT_CMD_STATUS_NO_RESOURCES          BtMgmtCmdStatus = 0x07
-	BT_MGMT_CMD_STATUS_TIMEOUT               BtMgmtCmdStatus = 0x08
-	BT_MGMT_CMD_STATUS_ALREADY_CONNECTED     BtMgmtCmdStatus = 0x09
-	BT_MGMT_CMD_STATUS_BUSY                  BtMgmtCmdStatus = 0x0A
-	BT_MGMT_CMD_STATUS_REJECTED              BtMgmtCmdStatus = 0x0B
-	BT_MGMT_CMD_STATUS_NOT_SUPPORTED         BtMgmtCmdStatus = 0x0C
-	BT_MGMT_CMD_STATUS_INVALID_PARAMETERS    BtMgmtCmdStatus = 0x0D
-	BT_MGMT_CMD_STATUS_DISCONNECTED          BtMgmtCmdStatus = 0x0E
-	BT_MGMT_CMD_STATUS_NOT_POWERED           BtMgmtCmdStatus = 0x0F
-	BT_MGMT_CMD_STATUS_CANCELLED             BtMgmtCmdStatus = 0x10
-	BT_MGMT_CMD_STATUS_INVALID_INDEX         BtMgmtCmdStatus = 0x11
-	BT_MGMT_CMD_STATUS_RF_KILLED             BtMgmtCmdStatus = 0x12
-	BT_MGMT_CMD_STATUS_ALREADY_PAIRED        BtMgmtCmdStatus = 0x13
-	BT_MGMT_CMD_STATUS_PERMISSION_DENIED     BtMgmtCmdStatus = 0x14
-)
-
-var CmdStatusErrorMap = genCmdStatusErrorMap()
-
-func genCmdStatusErrorMap() (eMap map[BtMgmtCmdStatus]error) {
-	eMap = make(map[BtMgmtCmdStatus]error)
-	eMap[BT_MGMT_CMD_STATUS_SUCCESS] = nil
-	eMap[BT_MGMT_CMD_STATUS_UNKNOWN_COMMAND] = errors.New("Unknown command")
-	eMap[BT_MGMT_CMD_STATUS_NOT_CONNECTED] = errors.New("Not connected")
-	eMap[BT_MGMT_CMD_STATUS_FAILED] = errors.New("Failed")
-	eMap[BT_MGMT_CMD_STATUS_CONNECT_FAILED] = errors.New("Connect failed")
-	eMap[BT_MGMT_CMD_STATUS_AUTHENTICATION_FAILED] = errors.New("Authentication failed")
-	eMap[BT_MGMT_CMD_STATUS_NOT_PAIRED] = errors.New("Not paired")
-	eMap[BT_MGMT_CMD_STATUS_NO_RESOURCES] = errors.New("No resources")
-	eMap[BT_MGMT_CMD_STATUS_TIMEOUT] = errors.New("Timeout")
-	eMap[BT_MGMT_CMD_STATUS_ALREADY_CONNECTED] = errors.New("Already connected")
-	eMap[BT_MGMT_CMD_STATUS_BUSY] = errors.New("Busy")
-	eMap[BT_MGMT_CMD_STATUS_REJECTED] = errors.New("Rejected")
-	eMap[BT_MGMT_CMD_STATUS_NOT_SUPPORTED] = errors.New("Not supported")
-	eMap[BT_MGMT_CMD_STATUS_INVALID_PARAMETERS] = errors.New("Invalid parameters")
-	eMap[BT_MGMT_CMD_STATUS_DISCONNECTED] = errors.New("Disconnected")
-	eMap[BT_MGMT_CMD_STATUS_NOT_POWERED] = errors.New("Not powered")
-	eMap[BT_MGMT_CMD_STATUS_CANCELLED] = errors.New("Cancelled")
-	eMap[BT_MGMT_CMD_STATUS_INVALID_INDEX] = errors.New("Invalid index")
-	eMap[BT_MGMT_CMD_STATUS_RF_KILLED] = errors.New("RFKilled")
-	eMap[BT_MGMT_CMD_STATUS_ALREADY_PAIRED] = errors.New("Already paired")
-	eMap[BT_MGMT_CMD_STATUS_PERMISSION_DENIED] = errors.New("Permission denied")
-
-	return eMap
+	return evt, nil
 }
