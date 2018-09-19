@@ -1,7 +1,9 @@
 package btmgmt
 
 import (
+	"context"
 	"errors"
+	"time"
 )
 
 var (
@@ -15,6 +17,134 @@ type MgmtEvent struct {
 	ControllerIdx uint16
 	ParamLen      uint16
 	Payload       []byte
+}
+
+type EventListener interface {
+	Filter(event MgmtEvent) bool
+	Handle(event MgmtEvent) (finished bool)
+}
+
+type DefaultCmdEvtListener struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	srcCmd MgmtCommand // the command
+
+	isDone bool
+
+	resParam *[]byte
+	resErr   error
+}
+
+func (l *DefaultCmdEvtListener) Filter(event MgmtEvent) bool {
+	if l.isDone { return false } // ignore events when done
+
+	// check if event is for same controller as the command
+	//fmt.Printf("Default command listener received Event: %+v\n", event)
+	if event.ControllerIdx != l.srcCmd.ControllerIdx {
+		return false
+	}
+
+	switch event.EventCode {
+	case BT_MGMT_EVT_COMMAND_STATUS:
+		cmdCode, _, parseErr := ParseEvtCmdStatus(event.Payload)
+		if parseErr == nil {
+			//fmt.Printf("Parsed Command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
+			if cmdCode == l.srcCmd.CommandCode {
+				return true
+			} // ignore events with wrong cmdCode
+		} //Ignore CommandStatus events which couldn't be parsed
+	case BT_MGMT_EVT_COMMAND_COMPLETE:
+		cmdCode, _, _, parseErr := ParseEvtCmdComplete(event.Payload)
+		if parseErr == nil {
+			//fmt.Printf("Parsed CommandComplete Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
+			if cmdCode == l.srcCmd.CommandCode {
+				//fmt.Println("... CommandCode matches, cancelling listener")
+				return true
+			} // ignore events with wrong cmdCode
+		} //Ignore CommandStatus events which couldn't be parsed
+	default:
+		return false // ignore events with different commandCode
+	}
+	return false
+}
+
+func (l *DefaultCmdEvtListener) Handle(event MgmtEvent) (finished bool) {
+	if l.isDone { return true } // indicate handle is finished
+
+	switch event.EventCode {
+	case BT_MGMT_EVT_COMMAND_STATUS:
+		cmdCode, state, parseErr := ParseEvtCmdStatus(event.Payload)
+		if parseErr == nil {
+			//fmt.Printf("Parsed Command Status Event: CmdCode: %v StatusCode: %v\n", cmdCode, state)
+			if cmdCode == l.srcCmd.CommandCode {
+				//fmt.Println("... CommandCode matches, cancelling listener")
+				// set correct error value (read by WaitResult)
+				if statusErr, exists := CmdStatusErrorMap[state]; exists {
+					l.resErr = statusErr
+				} else {
+					l.resErr = errors.New("Unknown command status for received event")
+				}
+				l.cancel()
+				return true // indicate listener could be removed
+			}
+		}
+	case BT_MGMT_EVT_COMMAND_COMPLETE:
+		cmdCode, state, resultParams, parseErr := ParseEvtCmdComplete(event.Payload)
+		if parseErr == nil {
+			//fmt.Printf("Parsed CommandComplete Event: CmdCode: %v StatusCode: %v Result params: %+v\n", cmdCode, state, resultParams)
+			if cmdCode == l.srcCmd.CommandCode {
+				//fmt.Println("... CommandCode matches, cancelling listener")
+				// set correct error value and result params (read by WaitResult)
+				if statusErr, exists := CmdStatusErrorMap[state]; exists {
+					l.resErr = statusErr
+					l.resParam = &resultParams
+				} else {
+					l.resErr = errors.New("Unknown command status for received event")
+				}
+				l.cancel()
+				return true // indicate listener could be removed
+			}
+		}
+	default:
+		return false
+	}
+	return false
+}
+
+func (l *DefaultCmdEvtListener) SetDone() {
+	l.isDone = true
+	l.cancel()
+}
+
+func (l *DefaultCmdEvtListener) WaitResult(timeout time.Duration) (*[]byte, error) {
+	timeoutCtx, cancelWait := context.WithTimeout(context.Background(), timeout)
+	select {
+	case <-timeoutCtx.Done():
+		// free cancel func by calling
+		cancelWait()
+		// cancelListener
+		l.cancel()
+		// return error
+		l.resErr = ErrCmdTimeout
+	case <-l.ctx.Done():
+		// The context of the listener was closed, this could happen because:
+		// 1) A command status event was received (maybe with error)
+		// 2) A command complete event was received (with success / error)
+		cancelWait() //free local cancel listener
+	}
+
+	return l.resParam, l.resErr
+}
+
+func NewDefaultCmdEvtListener(srcCmd MgmtCommand) (cmdResultListener *DefaultCmdEvtListener) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cmdResultListener = &DefaultCmdEvtListener{
+		ctx:    ctx,
+		cancel: cancel,
+		srcCmd: srcCmd,
+	}
+
+	return cmdResultListener
 }
 
 /*
@@ -152,6 +282,7 @@ const (
 )
 
 var CmdStatusErrorMap = genCmdStatusErrorMap()
+
 func genCmdStatusErrorMap() (eMap map[BtMgmtCmdStatus]error) {
 	eMap = make(map[BtMgmtCmdStatus]error)
 	eMap[BT_MGMT_CMD_STATUS_SUCCESS] = nil
@@ -175,7 +306,6 @@ func genCmdStatusErrorMap() (eMap map[BtMgmtCmdStatus]error) {
 	eMap[BT_MGMT_CMD_STATUS_RF_KILLED] = errors.New("RFKilled")
 	eMap[BT_MGMT_CMD_STATUS_ALREADY_PAIRED] = errors.New("Already paired")
 	eMap[BT_MGMT_CMD_STATUS_PERMISSION_DENIED] = errors.New("Permission denied")
-
 
 	return eMap
 }

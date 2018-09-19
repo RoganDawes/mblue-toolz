@@ -85,6 +85,12 @@ func main() {
 	fmt.Println("Run command ...")
 	cmdRes,cmdErr := mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
 	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_VERSION_INFORMATION)
+	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS)
+	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
+	cmdRes,cmdErr = mgmt.RunCmd(btmgmt.INDEX_CONTROLLER_NONE, btmgmt.BT_MGMT_CMD_READ_MANAGEMENT_VERSION_INFORMATION)
+	fmt.Printf("!!RESULT Command 'Management supported commands' err: %v res: %v\n", cmdErr, cmdRes)
 
 	fmt.Println("SOCK TEST END\n===============")
 	/*

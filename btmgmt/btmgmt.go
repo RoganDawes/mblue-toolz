@@ -1,7 +1,6 @@
 package btmgmt
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -47,15 +46,11 @@ type MgmtConnection struct {
 	abortEventHandlerLoop chan interface{} // used to abort eventHandler loop on close
 	newRawPacket          chan []byte      // used by socket reader loop to pass data to event handler loop
 	mutexListeners        *sync.Mutex
-	registeredListeners   map[MgmtEventListener]bool
-	addListener           chan MgmtEventListener
-	removeListener        chan MgmtEventListener
+	registeredListeners   map[EventListener]bool
+	addListener           chan EventListener
+	removeListener        chan EventListener
 }
 
-type MgmtEventListener interface {
-	EventInput() chan <- MgmtEvent
-	Context() context.Context
-}
 
 func NewMgmtConnection() (res *MgmtConnection, err error) {
 	res = &MgmtConnection{
@@ -71,9 +66,9 @@ func NewMgmtConnection() (res *MgmtConnection, err error) {
 		abortEventHandlerLoop: make(chan interface{}),
 		newRawPacket:          make(chan []byte), // no buffer
 		mutexListeners:        &sync.Mutex{},
-		addListener:           make(chan MgmtEventListener),
-		removeListener:        make(chan MgmtEventListener),
-		registeredListeners:   make(map[MgmtEventListener]bool),
+		addListener:           make(chan EventListener),
+		removeListener:        make(chan EventListener),
+		registeredListeners:   make(map[EventListener]bool),
 	}
 	err = res.Connect()
 	if err != nil {
@@ -89,12 +84,12 @@ func NewMgmtConnection() (res *MgmtConnection, err error) {
 	return res, nil
 }
 
-func (m *MgmtConnection) AddListener(l MgmtEventListener) {
+func (m *MgmtConnection) AddListener(l EventListener) {
 	//fmt.Println("Listener marked for addition")
 	m.addListener <- l
 }
 
-func (m *MgmtConnection) RemoveListener(l MgmtEventListener) {
+func (m *MgmtConnection) RemoveListener(l EventListener) {
 	//fmt.Printf("Listener marked for remove: %v\n", l)
 	m.removeListener <- l
 }
@@ -129,7 +124,7 @@ func (m *MgmtConnection) socketReaderLoop() {
 func (m *MgmtConnection) eventHandlerLoop() {
 	//fmt.Println("Event handler started")
 
-	listenerDeleteMap := make(map[MgmtEventListener]bool)
+	listenerDeleteMap := make(map[EventListener]bool)
 
 	Outer:
 	for {
@@ -155,14 +150,11 @@ func (m *MgmtConnection) eventHandlerLoop() {
 			}
 			m.mutexListeners.Lock()
 			// Dispatch to listeners
-			Inner:
 			for l,_ := range m.registeredListeners {
-				select {
-				case l.EventInput() <- *evt:
-				case <- l.Context().Done():
-					//m.RemoveListener(l) // could produce a dead lock
-					listenerDeleteMap[l] = true
-					continue Inner
+				if l.Filter(*evt) {
+					if l.Handle(*evt) {
+						listenerDeleteMap[l] = true // mark for delition if handler succeeded
+					}
 				}
 			}
 
@@ -201,7 +193,7 @@ func (m *MgmtConnection) RunCmd(controllerId uint16, cmdCode BtMgmtCmdCode, para
 	)
 
 	// created listener for given command
-	commandL := NewCmdDefaultListener(command)
+	commandL := NewDefaultCmdEvtListener(command)
 	// register listener for command result
 	m.AddListener(commandL)
 	// send command
