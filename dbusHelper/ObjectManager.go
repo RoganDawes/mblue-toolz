@@ -1,7 +1,6 @@
 package dbusHelper
 
 import (
-	"fmt"
 	"github.com/godbus/dbus"
 )
 
@@ -32,7 +31,7 @@ func (om *ObjectManager) UpdateManagedObjects() (err error) {
 	callRes,err := om.c.Call("GetManagedObjects")
 	if err != nil { return err }
 	callRes.Store(&om.objects)
-	fmt.Printf("ManagedObjects: %+v\n", om.objects)
+	//fmt.Printf("ManagedObjects: %+v\n", om.objects)
 	return
 }
 

@@ -89,29 +89,37 @@ also always generate a command Status event with the Invalid Index
 status code.
 */
 
+type Discoverability byte
+
+const (
+	NOT_DISCOVERABLE     Discoverability = 0x00
+	GENERAL_DISCOVERABLE Discoverability = 0x01
+	LIMITED_DISCOVERABLE Discoverability = 0x02
+)
+
 type CmdCode uint16
 
 const (
 	CMD_READ_MANAGEMENT_VERSION_INFORMATION CmdCode = 0x01
-	CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS  CmdCode = 0x02
-	CMD_READ_CONTROLLER_INDEX_LIST          CmdCode = 0x03
-	CMD_READ_CONTROLLER_INFORMATION         CmdCode = 0x04
-	CMD_SET_POWERED                         CmdCode = 0x05
-	CMD_SET_DISCOVERABLE                    CmdCode = 0x06
-	CMD_SET_CONNECTABLE                     CmdCode = 0x07
-	CMD_SET_FAST_CONNECTABLE                CmdCode = 0x08
-	CMD_SET_BONDABLE                        CmdCode = 0x09
-	CMD_SET_LINK_SECURITY                   CmdCode = 0x0A
-	CMD_SET_SIMPLE_SECURE_PAIRING           CmdCode = 0x0B
-	CMD_SET_HIGH_SPEED                      CmdCode = 0x0C
-	CMD_SET_LOW_ENERGY                      CmdCode = 0x0D
-	CMD_SET_DEVICE_CLASS                    CmdCode = 0x0E
-	CMD_SET_LOCAL_NAME                      CmdCode = 0x0F
-	CMD_ADD_UUID                            CmdCode = 0x10
-	CMD_REMOVE_UUID                         CmdCode = 0x11
-	CMD_LOAD_LINK_KEYS                      CmdCode = 0x12
-	CMD_LOAD_LONG_TERM_KEYS                 CmdCode = 0x13
-	CMD_DISCONNECT                          CmdCode = 0x14
+	CMD_READ_MANAGEMENT_SUPPORTED_COMMANDS CmdCode = 0x02
+	CMD_READ_CONTROLLER_INDEX_LIST         CmdCode = 0x03
+	CMD_READ_CONTROLLER_INFORMATION        CmdCode = 0x04
+	CMD_SET_POWERED                        CmdCode = 0x05
+	CMD_SET_DISCOVERABLE                   CmdCode = 0x06
+	CMD_SET_CONNECTABLE                    CmdCode = 0x07
+	CMD_SET_FAST_CONNECTABLE               CmdCode = 0x08
+	CMD_SET_BONDABLE                       CmdCode = 0x09
+	CMD_SET_LINK_SECURITY                  CmdCode = 0x0A
+	CMD_SET_SECURE_SIMPLE_PAIRING          CmdCode = 0x0B
+	CMD_SET_HIGH_SPEED                     CmdCode = 0x0C
+	CMD_SET_LOW_ENERGY                     CmdCode = 0x0D
+	CMD_SET_DEVICE_CLASS                   CmdCode = 0x0E
+	CMD_SET_LOCAL_NAME                     CmdCode = 0x0F
+	CMD_ADD_UUID                           CmdCode = 0x10
+	CMD_REMOVE_UUID                        CmdCode = 0x11
+	CMD_LOAD_LINK_KEYS                     CmdCode = 0x12
+	CMD_LOAD_LONG_TERM_KEYS                CmdCode = 0x13
+	CMD_DISCONNECT                         CmdCode = 0x14
 	CMD_GET_CONECTIONS                      CmdCode = 0x15
 	CMD_PIN_CODE_REPLY                      CmdCode = 0x16
 	CMD_PIN_CODE_NEGATIVE_REPLY             CmdCode = 0x17
@@ -236,4 +244,3 @@ func genCmdStatusErrorMap() (eMap map[CmdStatus]error) {
 
 	return eMap
 }
-
