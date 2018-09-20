@@ -147,6 +147,22 @@ func Tests() {
 }
 */
 
+func TestNapServer(adapterPath dbus.ObjectPath) {
+	nwSrv, err := toolz.NetworkServer(adapterPath)
+	if err == nil {
+		fmt.Println("Established NetworkServer1 interface ...")
+		fmt.Println("Enabeling 'nap' service, new bnep connections are attached to 'testbr' (has to exist already)")
+		err = nwSrv.Register(toolz.UUID_NETWORK_SERVER_NAP, "testbr") // No error if bridge doesn't exist
+		if err == nil {
+			fmt.Println("... success")
+		} else {
+			fmt.Printf("... failed: %v\n", err)
+		}
+	} else {
+		fmt.Printf("Error creating Networkserver1 interface: %v\n", err)
+	}
+}
+
 func SetSSPForAllController(SSPEnabled bool) (err error) {
 	// This method uses the mgmt-api (based on "Bluetooth Management sockets", not DBus)
 
@@ -306,6 +322,8 @@ func (DemoAgent) Cancel() *dbus.Error {
 func main() {
 	AdapterName := "hci0" //Assume the controller used by DBus is called "hci0" change if needed
 	useSSP := true // if true, the demo tries to enable SSP, otherwise to disable (influence on pairing agent behavior)
+	//agentCap := toolz.AGENT_CAP_DISPLAY_YES_NO
+	agentCap := toolz.AGENT_CAP_NO_INPUT_NO_OUTPUT //<-- "just works" connection, no manual passcode interaction, no callbacks to agent
 
 	hci0_adapter,err := toolz.Adapter(toolz.AdapterNameToDBusPath(AdapterName))
 	if err != nil { panic(fmt.Sprintf("Couldn't open adapter '%s'", AdapterName)) }
@@ -343,7 +361,15 @@ func main() {
 	// Note 2: SSP mode toggling can't be achieved via DBus API. BtMgmt provides the
 	// needed bindings for the "Bluetooth Management sockets" based mgmt API, to achieve this.
 	fmt.Println("Registering demo pairing agent (requests PIN '12345' if SSP is disabled)")
-	toolz.RegisterDefaultAgent(DemoAgent{}, toolz.AGENT_CAP_DISPLAY_YES_NO)
+	toolz.RegisterDefaultAgent(DemoAgent{}, agentCap)
+
+	fmt.Println("Starting nap service ...")
+	// Note:
+	// This relies on existence of an bridge interface named 'testbr'. A bridge could easily
+	// be added with the `brctl` command-line utility
+	// Most devices assume a DHCP server is running on the NAP, thus one should be deployed for
+	// the bridge interface.
+	TestNapServer(toolz.AdapterNameToDBusPath(AdapterName))
 
 	// Prevent process from exiting, till SIGTERM or SIGINT
 	fmt.Println("Process idle (to keep bt-agent running) ... stop with SIGTERM or SIGINT")
