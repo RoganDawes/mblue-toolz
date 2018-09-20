@@ -27,6 +27,11 @@ func (a *NetworkServer1) Unregister(uuid string) error {
 	return call.Err
 }
 
+func (a *NetworkServer1) Close() {
+	// closes CLients DBus connection
+	a.c.Disconnect()
+}
+
 func NetworkServer(deviceName string) (res *NetworkServer1, err error) {
 	exists, err := adapterExists(deviceName)
 	if err != nil {

@@ -29,6 +29,10 @@ func (pm *ProfileManager1) UnregisterProfile(profilePath dbus.ObjectPath) error 
 	return call.Err
 }
 
+func (pm *ProfileManager1) Close() {
+	// closes CLients DBus connection
+	pm.c.Disconnect()
+}
 
 func ProfileManager() (res *ProfileManager1, err error) {
 	res = &ProfileManager1{

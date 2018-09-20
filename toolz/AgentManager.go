@@ -81,6 +81,11 @@ func (a *AgentManager1) ExportGoAgentToDBus(agentInstance Agent1Interface, targe
 	return nil
 }
 
+func (am *AgentManager1) Close() {
+	// closes CLients DBus connection
+	am.c.Disconnect()
+}
+
 func AgentManager() (res *AgentManager1, err error) {
 	res = &AgentManager1{
 		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", dbusIfaceAgentManager, "/org/bluez"),
@@ -89,8 +94,10 @@ func AgentManager() (res *AgentManager1, err error) {
 }
 
 /*
-Registers the given Agent as global default agent (used for all pairing requests)
+Expose static functions for registering a default agent + unregistering
  */
+
+// Registers the given Agent as global default agent (used for all pairing requests)
 func RegisterDefaultAgent(agent Agent1Interface, caps AgentCapability) (err error) {
 	//agent_path := AgentDefaultRegisterPath // we use the default path
 	agent_path := agent.RegistrationPath() // we use the default path
@@ -98,6 +105,7 @@ func RegisterDefaultAgent(agent Agent1Interface, caps AgentCapability) (err erro
 	// Register agent
 	am,err := AgentManager()
 	if err != nil { return err }
+	defer am.Close()
 
 	// Export the Go interface to DBus
 	err = am.ExportGoAgentToDBus(agent, dbus.ObjectPath(agent_path))
@@ -109,6 +117,19 @@ func RegisterDefaultAgent(agent Agent1Interface, caps AgentCapability) (err erro
 
 	// Set the new application agent as Default Agent
 	err = am.RequestDefaultAgent(dbus.ObjectPath(agent_path))
+	if err != nil { return err }
+
+	return
+}
+
+func UnregisterAgent(path string) (err error) {
+	// Register agent
+	am,err := AgentManager()
+	if err != nil { return err }
+	defer am.Close()
+
+	// Register the exported interface as application agent via AgenManager API
+	err = am.UnregisterAgent(dbus.ObjectPath(path))
 	if err != nil { return err }
 
 	return
