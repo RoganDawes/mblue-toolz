@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/godbus/dbus"
+	"github.com/mame82/mblue-toolz/bt_uuid"
 	"github.com/mame82/mblue-toolz/btmgmt"
 	"github.com/mame82/mblue-toolz/toolz"
 	"os"
@@ -306,8 +307,14 @@ func (DemoAgent) RequestAuthorization(device dbus.ObjectPath) *dbus.Error {
 
 func (DemoAgent) AuthorizeService(device dbus.ObjectPath, uuid string) *dbus.Error {
 	fmt.Printf("DemoAgent authorize service called for UUID: %s\n", uuid)
-	fmt.Println("... rejecting")
-	return toolz.ErrRejected
+	switch uuid {
+	case bt_uuid.BNEP_SVC_UUID:
+		fmt.Println("Granting BNEP access")
+		return nil
+	default:
+		fmt.Println("... rejecting")
+		return toolz.ErrRejected
+	}
 }
 
 func (DemoAgent) Cancel() *dbus.Error {

@@ -1,4 +1,4 @@
-package uuid
+package bt_uuid
 
 // ToDo: implement proper support for different kinds of UUID (UUID16, UUID32, UUID128)
 // see: https://www.bluetooth.com/specifications/assigned-numbers/service-discovery
