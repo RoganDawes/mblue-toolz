@@ -4,6 +4,7 @@ import (
 	"github.com/godbus/dbus"
 	"github.com/mame82/mblue-toolz/dbusHelper"
 	"errors"
+	"net"
 )
 
 const DBusNameDevice1Interface = "org.bluez.Device1"
@@ -35,6 +36,7 @@ const (
 
 var (
 	eDeviceNotExistent = errors.New("Device doesn't exist")
+	ePropertyTypeCast  = errors.New("Error casting property to intended type")
 )
 
 
@@ -121,14 +123,79 @@ func (d *Device1) SetBlocked(val bool) (err error) {
 	return d.c.SetProperty(PropDeviceBlocked, val)
 }
 
-func Device(devicePath dbus.ObjectPath) (res *Device1, err error) {
+func (d *Device1) GetAddress() (res net.HardwareAddr, err error) {
+	val, err := d.c.GetProperty(PropDeviceAddress)
+	if err != nil {
+		return
+	}
+	strAddr,ok := val.Value().(string)
+	if !ok {
+		return res, ePropertyTypeCast
+	}
+	res,err = net.ParseMAC(strAddr)
+	if err != nil { return res, ePropertyTypeCast }
+	return
+}
 
+func (d *Device1) GetAddressType() (res string, err error) {
+	val, err := d.c.GetProperty(PropDeviceAddressType)
+	if err != nil {
+		return
+	}
+	res,ok := val.Value().(string)
+	if !ok {
+		return res, ePropertyTypeCast
+	}
+	return
+}
+
+func (d *Device1) GetConnected() (res bool, err error) {
+	val, err := d.c.GetProperty(PropDeviceConnected)
+	if err != nil {
+		return
+	}
+	res,ok := val.Value().(bool)
+	if !ok {
+		return res, ePropertyTypeCast
+	}
+	return
+}
+
+func (d *Device1) GetPaired() (res bool, err error) {
+	val, err := d.c.GetProperty(PropDevicePaired)
+	if err != nil {
+		return
+	}
+	res,ok := val.Value().(bool)
+	if !ok {
+		return res, ePropertyTypeCast
+	}
+	return
+}
+
+
+func (d *Device1) GetAlias() (res string, err error) {
+	val, err := d.c.GetProperty(PropDeviceAlias)
+	if err != nil {
+		return
+	}
+	res,ok := val.Value().(string)
+	if !ok {
+		return res, ePropertyTypeCast
+	}
+	return
+}
+
+func (d *Device1) SetAlias(val string) (err error) {
+	return d.c.SetProperty(PropDeviceAlias, val)
+}
+
+
+func Device(devicePath dbus.ObjectPath) (res *Device1, err error) {
 	exists, err := deviceExists(devicePath)
 	if err != nil || !exists{
 		return nil, eDeviceNotExistent
 	}
-
-
 	res = &Device1{
 		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameDevice1Interface, devicePath),
 	}
