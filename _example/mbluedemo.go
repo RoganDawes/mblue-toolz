@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/godbus/dbus"
 	"github.com/mame82/mblue-toolz/btmgmt"
@@ -8,7 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"errors"
+	"time"
 )
 
 /*
@@ -231,39 +232,58 @@ func (DemoAgent) RegistrationPath() string {
 }
 
 func (DemoAgent) Release() *dbus.Error {
+	// Should be called when agent is unregistered, but couldn't be achieved during tests
 	fmt.Println("DemoAgent release called")
 	return nil
 }
 
 func (DemoAgent) RequestPinCode(device dbus.ObjectPath) (pincode string, err *dbus.Error) {
+	// Called when SSP is off and cap != CAP_NO_INPUT_NO_OUTPUT
 	fmt.Println("DemoAgent request pincode called, returning string '12345'")
 	return "12345", nil
 }
 
 func (DemoAgent) DisplayPinCode(device dbus.ObjectPath, pincode string) *dbus.Error {
+	// Should be called if SSP off and cap == AGENT_CAP_DISPLAY_ONLY ??
+	// No working configuration found to end up with this callback
 	fmt.Printf("DemoAgent display pincode called, code: '%s'\n", pincode)
+	time.Sleep(time.Second)
 	return nil
 }
 
 func (DemoAgent) RequestPasskey(device dbus.ObjectPath) (passkey uint32, err *dbus.Error) {
 	fmt.Println("DemoAgent request passkey called, returning integer 1337")
+	// Called with SSP on and Cap == AGENT_CAP_KEYBOARD_ONLY
+	// The needed passkey is random, thus it is unlikely that the returned value (1337) matches
+
+	// give the remote device 5 seconds to show the needed passkey, before we return 1337 (which should be wrong)
+	time.Sleep(time.Second * 5)
 	return 1337, nil
 }
 
 func (DemoAgent) DisplayPasskey(device dbus.ObjectPath, passkey uint32, entered uint16) *dbus.Error {
+	// Should be called if SSP on and cap == AGENT_CAP_DISPLAY_ONLY ??
+	// No working configuration found to end up with this callback
 	fmt.Printf("DemoAgent display passkey called, passkey: %d\n", passkey)
+	time.Sleep(time.Second)
 	return nil
 }
 
 func (DemoAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) *dbus.Error {
+	// Called when SSP on and
+	// cap == AGENT_CAP_DISPLAY_ONLY || (weird, why this ???)
+	// cap == AGENT_CAP_KEYBOARD_DISPLAY ||
+	// cap == AGENT_CAP_DISPLAY_YES_NO
 	fmt.Printf("DemoAgent request confirmation called for passkey: %d\n", passkey)
 
+	time.Sleep(time.Second * 5)
 	fmt.Println("... rejecting passkey")
 	return toolz.ErrRejected
 }
 
 func (DemoAgent) RequestAuthorization(device dbus.ObjectPath) *dbus.Error {
 	fmt.Println("DemoAgent request authorization called")
+	time.Sleep(time.Second * 5)
 	fmt.Println("... rejecting")
 	return toolz.ErrRejected
 }
@@ -285,7 +305,7 @@ func (DemoAgent) Cancel() *dbus.Error {
 
 func main() {
 	AdapterName := "hci0" //Assume the controller used by DBus is called "hci0" change if needed
-	useSSP := false // if true, the demo tries to enable SSP, otherwise to disable (influence on pairing agent behavior)
+	useSSP := true // if true, the demo tries to enable SSP, otherwise to disable (influence on pairing agent behavior)
 
 	hci0_adapter,err := toolz.Adapter(AdapterName)
 	if err != nil { panic(fmt.Sprintf("Couldn't open adapter '%s'", AdapterName)) }
@@ -323,7 +343,7 @@ func main() {
 	// Note 2: SSP mode toggling can't be achieved via DBus API. BtMgmt provides the
 	// needed bindings for the "Bluetooth Management sockets" based mgmt API, to achieve this.
 	fmt.Println("Registering demo pairing agent (requests PIN '12345' if SSP is disabled)")
-	toolz.RegisterDefaultAgent(DemoAgent{}, toolz.AGENT_CAP_DISPLAY_ONLY)
+	toolz.RegisterDefaultAgent(DemoAgent{}, toolz.AGENT_CAP_DISPLAY_YES_NO)
 
 	// Prevent process from exiting, till SIGTERM or SIGINT
 	fmt.Println("Process idle (to keep bt-agent running) ... stop with SIGTERM or SIGINT")

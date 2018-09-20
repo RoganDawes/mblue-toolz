@@ -3,7 +3,7 @@ package btmgmt
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/pkg/errors"
+	"errors"
 	"sync"
 )
 

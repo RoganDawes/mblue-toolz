@@ -63,6 +63,22 @@ func (d *Device1) Disconnect() error {
 	return call.Err
 }
 
+func (d *Device1) ConnectProfile(uuid string) error {
+	call, err := d.c.Call("ConnectProfile", uuid)
+	if err != nil {
+		return err
+	}
+	return call.Err
+}
+
+func (d *Device1) DisconnectProfile(uuid string) error {
+	call, err := d.c.Call("DisconnectProfile", uuid)
+	if err != nil {
+		return err
+	}
+	return call.Err
+}
+
 func (d *Device1) Pair() error {
 	call, err := d.c.Call("Pair")
 	if err != nil {
@@ -104,9 +120,6 @@ func (d *Device1) GetBlocked() (res bool, err error) {
 func (d *Device1) SetBlocked(val bool) (err error) {
 	return d.c.SetProperty(PropDeviceBlocked, val)
 }
-
-
-
 
 func Device(devicePath string) (res *Device1, err error) {
 

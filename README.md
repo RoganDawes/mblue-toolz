@@ -7,6 +7,7 @@ Status: Under construction, experimental forever
 ## Supported
 - Adapter (DBus)
 - AgentManager (DBus)
+- ProfileManager (DBus)
 - Device (DBus)
 - Network (DBus, currently only NetworkServer: nap, panu, gn)
 - **mgmt-api** (Bluetooth Management Socket, only commands used by P4wnP1, focus was on SSP mode toggling)
