@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-const dbusIfaceDevice = "org.bluez.Device1"
+const DBusNameDevice1Interface = "org.bluez.Device1"
 
 const (
 	PropDeviceAddress          = "Address"          //readonly, string -> net.HardwareAddr
@@ -130,7 +130,7 @@ func Device(devicePath string) (res *Device1, err error) {
 
 
 	res = &Device1{
-		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", dbusIfaceDevice, devicePath),
+		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameDevice1Interface, devicePath),
 	}
 	return
 }
@@ -152,6 +152,6 @@ func deviceExists(devicePath string) (exists bool, err error) {
 	}
 
 	// The path to the adapter exists - check Adapter1 interface is present, to assure we fetched an adapter
-	_, exists = adapter[dbusIfaceDevice]
+	_, exists = adapter[DBusNameDevice1Interface]
 	return
 }

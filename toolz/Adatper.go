@@ -13,7 +13,7 @@ var (
 )
 
 // See https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/adapter-api.txt
-const dbusIfaceAdapter = "org.bluez.Adapter1"
+const DBusNameAdapter1Interface = "org.bluez.Adapter1"
 const (
 	PropAdapterAddress             = "Address"             //readonly, string -> net.HardwareAddr
 	PropAdapterAddressType         = "AddressType"         //readonly, string
@@ -48,7 +48,7 @@ func adapterExists(adapterName string) (exists bool, err error) {
 	}
 
 	// The path to the adapter exists - check Adapter1 interface is present, to assure we fetched an adapter
-	_, exists = adapter[dbusIfaceAdapter]
+	_, exists = adapter[DBusNameAdapter1Interface]
 	return
 }
 
@@ -234,7 +234,7 @@ func Adapter(deviceName string) (res *Adapter1, err error) {
 	}
 
 	res = &Adapter1{
-		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", dbusIfaceAdapter, "/org/bluez/"+deviceName),
+		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameAdapter1Interface, "/org/bluez/"+deviceName),
 	}
 	return
 }

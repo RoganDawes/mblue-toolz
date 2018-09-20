@@ -4,7 +4,7 @@ import (
 	"github.com/godbus/dbus"
 )
 
-const DBusAgent1Interface = "org.bluez.Agent1"
+const DBusNameAgent1Interface = "org.bluez.Agent1"
 const AgentDefaultRegisterPath = "/org/bluez/mame82agent"
 
 var ErrRejected = dbus.NewError("org.bluez.Error.Rejected", nil)

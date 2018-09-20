@@ -7,7 +7,7 @@ import (
 	"github.com/mame82/mblue-toolz/dbusHelper"
 )
 
-const dbusIfaceAgentManager = "org.bluez.AgentManager1"
+const DBusNameAgentManager1Interface = "org.bluez.AgentManager1"
 
 type AgentCapability string
 const (
@@ -52,7 +52,7 @@ func (a *AgentManager1) ExportGoAgentToDBus(agentInstance Agent1Interface, targe
 	if err != nil { return err }
 
 	//Export the given agent to the given path as interface "org.bluez.Agent1"
-	err = conn.Export(agentInstance, dbus.ObjectPath(targetPath), DBusAgent1Interface)
+	err = conn.Export(agentInstance, dbus.ObjectPath(targetPath), DBusNameAgent1Interface)
 	if err != nil { return err }
 
 
@@ -65,7 +65,7 @@ func (a *AgentManager1) ExportGoAgentToDBus(agentInstance Agent1Interface, targe
 			prop.IntrospectData,
 			// org.bluez.Agent1
 			{
-				Name: DBusAgent1Interface,
+				Name:    DBusNameAgent1Interface,
 				Methods: introspect.Methods(agentInstance),
 			},
 		},
@@ -88,7 +88,7 @@ func (am *AgentManager1) Close() {
 
 func AgentManager() (res *AgentManager1, err error) {
 	res = &AgentManager1{
-		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", dbusIfaceAgentManager, "/org/bluez"),
+		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameAgentManager1Interface, "/org/bluez"),
 	}
 	return
 }

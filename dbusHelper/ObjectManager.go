@@ -22,7 +22,7 @@ func (om *ObjectManager) GetManagedObjects() (o DBusObjects) {
 	return om.objects
 }
 
-func (om *ObjectManager) Close() () {
+func (om *ObjectManager) Close() {
 	om.c.Disconnect()
 	return
 }
@@ -43,6 +43,41 @@ func (om *ObjectManager) GetObject(objectPath dbus.ObjectPath) (bluezObj map[str
 	return bluezObj, exists, nil
 }
 
+func (om *ObjectManager) GetAllObjectsOfInterface(interfaceString string) (resultObjs DBusObjects, err error) {
+	err = om.UpdateManagedObjects()
+	if err != nil { return }
+	mObjs := om.GetManagedObjects()
+
+	// iterate over Bluez objects
+	resultObjs = make(DBusObjects)
+	for objPath, interfaceMap := range mObjs {
+	//	fmt.Println("Path: ", objPath)
+		for ifName,_ := range interfaceMap {
+	//	for ifName,ifData := range interfaceMap {
+	//		fmt.Printf("\tinterface name: %s\n", ifName)
+	//		fmt.Printf("\t\tinterface data: %s\n", ifData)
+			if interfaceString == ifName {
+				resultObjs[objPath] = interfaceMap
+	//			fmt.Println("!!!HIT!!!")
+			}
+		}
+
+	}
+
+	//fmt.Println("!!AFTER HIT!!", resultObjs)
+	return resultObjs, nil
+}
+
+func (om *ObjectManager) GetAllObjectsPathOfInterface(interfaceString string) (results []dbus.ObjectPath, err error) {
+	objs,err := om.GetAllObjectsOfInterface(interfaceString)
+	if err != nil { return }
+
+	for path := range objs {
+		results = append(results, path)
+	}
+
+	return
+}
 
 func NewObjectManager() (om *ObjectManager, err error) {
 	om = &ObjectManager{

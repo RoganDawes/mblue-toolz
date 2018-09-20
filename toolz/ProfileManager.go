@@ -5,7 +5,7 @@ import (
 	"github.com/mame82/mblue-toolz/dbusHelper"
 )
 
-const dbusIfaceProfileManager = "org.bluez.ProfileManager1"
+const DBusNameProfileManager1Interface = "org.bluez.ProfileManager1"
 
 type DBusBluezProfileOptions map[string]dbus.Variant
 
@@ -36,7 +36,7 @@ func (pm *ProfileManager1) Close() {
 
 func ProfileManager() (res *ProfileManager1, err error) {
 	res = &ProfileManager1{
-		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", dbusIfaceProfileManager, "/org/bluez"),
+		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameProfileManager1Interface, "/org/bluez"),
 	}
 	return
 }

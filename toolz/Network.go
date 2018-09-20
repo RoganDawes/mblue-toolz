@@ -4,7 +4,7 @@ import (
 	"github.com/mame82/mblue-toolz/dbusHelper"
 )
 
-const DBusNetworkServer1Interface = "org.bluez.NetworkServer1"
+const DBusNameNetworkServer1Interface = "org.bluez.NetworkServer1"
 
 type NetworkServer1 struct {
 	c *dbusHelper.Client
@@ -42,7 +42,7 @@ func NetworkServer(deviceName string) (res *NetworkServer1, err error) {
 	}
 
 	res = &NetworkServer1{
-		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNetworkServer1Interface, "/org/bluez/"+deviceName),
+		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameNetworkServer1Interface, "/org/bluez/"+deviceName),
 	}
 	return
 }
