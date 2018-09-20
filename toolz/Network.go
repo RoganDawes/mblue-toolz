@@ -28,12 +28,12 @@ func (a *NetworkServer1) Unregister(uuid string) error {
 }
 
 func NetworkServer(deviceName string) (res *NetworkServer1, err error) {
-	exists, err := Exists(deviceName)
+	exists, err := adapterExists(deviceName)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, eDoesntExist
+		return nil, eAdatpterNotExistent
 	}
 
 	res = &NetworkServer1{

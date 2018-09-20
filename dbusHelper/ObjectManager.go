@@ -35,6 +35,15 @@ func (om *ObjectManager) UpdateManagedObjects() (err error) {
 	return
 }
 
+func (om *ObjectManager) GetObject(objectPath dbus.ObjectPath) (bluezObj map[string]map[string]dbus.Variant, exists bool, err error) {
+	err = om.UpdateManagedObjects()
+	if err != nil { return }
+	objs := om.GetManagedObjects()
+	bluezObj,exists = objs[objectPath]
+	return bluezObj, exists, nil
+}
+
+
 func NewObjectManager() (om *ObjectManager, err error) {
 	om = &ObjectManager{
 		c: NewClient(SystemBus, "org.bluez", "org.freedesktop.DBus.ObjectManager", "/"),

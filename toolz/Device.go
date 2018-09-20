@@ -1,7 +1,9 @@
 package toolz
 
 import (
+	"github.com/godbus/dbus"
 	"github.com/mame82/mblue-toolz/dbusHelper"
+	"errors"
 )
 
 const dbusIfaceDevice = "org.bluez.Device1"
@@ -30,6 +32,11 @@ const (
 	PropDeviceAdvertisingFlags = "AdvertisingFlags" //readonly, experimental, []byte
 	PropDeviceAdvertisingData  = "AdvertisingData"  //readonly, experimental, map[uint8][]byte ???
 )
+
+var (
+	eDeviceNotExistent = errors.New("Device doesn't exist")
+)
+
 
 type Device1 struct {
 	c *dbusHelper.Client
@@ -102,36 +109,36 @@ func (d *Device1) SetBlocked(val bool) (err error) {
 
 
 func Device(devicePath string) (res *Device1, err error) {
-	/*
-	exists, err := Exists(deviceName)
-	if err != nil {
-		return nil, err
+
+	exists, err := deviceExists(devicePath)
+	if err != nil || !exists{
+		return nil, eDeviceNotExistent
 	}
-	if !exists {
-		return nil, eDoesntExist
-	}
-	*/
+
 
 	res = &Device1{
 		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", dbusIfaceDevice, devicePath),
 	}
 	return
 }
-/*
-func Exists(adapterName string) (exists bool, err error) {
+
+func deviceExists(devicePath string) (exists bool, err error) {
 	om, err := dbusHelper.NewObjectManager()
 	if err != nil {
 		return
 	}
 	defer om.Close()
 
-	objs := om.GetManagedObjects()
-	opath := dbus.ObjectPath("/org/bluez/" + adapterName)
-	dev, exists := objs[opath]
-	if !exists {
+	//	objs := om.GetManagedObjects()
+	//
+
+	opath := dbus.ObjectPath(devicePath)
+	adapter,exists,err := om.GetObject(opath)
+	if !exists || err != nil {
 		return
 	}
-	_, exists = dev[dbusIfaceAdapter]
+
+	// The path to the adapter exists - check Adapter1 interface is present, to assure we fetched an adapter
+	_, exists = adapter[dbusIfaceDevice]
 	return
 }
-*/

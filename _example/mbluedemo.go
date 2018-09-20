@@ -226,6 +226,10 @@ func WaitForSig() {
 // implements toolz.Agent1Interface
 type DemoAgent struct {}
 
+func (DemoAgent) RegistrationPath() string {
+	return toolz.AgentDefaultRegisterPath
+}
+
 func (DemoAgent) Release() *dbus.Error {
 	fmt.Println("DemoAgent release called")
 	return nil
@@ -270,8 +274,9 @@ func (DemoAgent) AuthorizeService(device dbus.ObjectPath, uuid string) *dbus.Err
 	return toolz.ErrRejected
 }
 
-func (DemoAgent) Cancel() {
+func (DemoAgent) Cancel() *dbus.Error {
 	fmt.Println("DemoAgent cancel called")
+	return nil
 }
 // ------------ END OF AGENT IMPLEMENTATION ------------
 

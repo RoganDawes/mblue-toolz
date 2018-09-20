@@ -1,15 +1,15 @@
 package toolz
 
 import (
+	"errors"
 	"github.com/godbus/dbus"
 	"github.com/mame82/mblue-toolz/dbusHelper"
-	"github.com/pkg/errors"
 	"log"
 	"net"
 )
 
 var (
-	eDoesntExist = errors.New("Adapter doesn't exist")
+	eAdatpterNotExistent = errors.New("Adapter doesn't exist")
 )
 
 // See https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/adapter-api.txt
@@ -31,20 +31,24 @@ const (
 )
 
 
-func Exists(adapterName string) (exists bool, err error) {
+func adapterExists(adapterName string) (exists bool, err error) {
 	om, err := dbusHelper.NewObjectManager()
 	if err != nil {
 		return
 	}
 	defer om.Close()
 
-	objs := om.GetManagedObjects()
+//	objs := om.GetManagedObjects()
+//
+
 	opath := dbus.ObjectPath("/org/bluez/" + adapterName)
-	dev, exists := objs[opath]
-	if !exists {
+	adapter,exists,err := om.GetObject(opath)
+	if !exists || err != nil {
 		return
 	}
-	_, exists = dev[dbusIfaceAdapter]
+
+	// The path to the adapter exists - check Adapter1 interface is present, to assure we fetched an adapter
+	_, exists = adapter[dbusIfaceAdapter]
 	return
 }
 
@@ -58,7 +62,6 @@ func (a *Adapter1) Close() {
 }
 
 
-// ToDo: Modify all interface methods to return call.Err
 func (a *Adapter1) StartDiscovery() error {
 	name, err := a.GetName()
 	if err != nil {
@@ -69,8 +72,8 @@ func (a *Adapter1) StartDiscovery() error {
 	if err != nil {
 		return err
 	}
-	call.Store()
-	return err
+
+	return call.Err
 }
 
 func (a *Adapter1) StopDiscovery() error {
@@ -83,8 +86,7 @@ func (a *Adapter1) StopDiscovery() error {
 	if err != nil {
 		return err
 	}
-	call.Store()
-	return err
+	return call.Err
 }
 
 // ToDo: void RemoveDevice(object device)
@@ -223,12 +225,12 @@ func (a *Adapter1) GetModalias() (res string, err error) {
 }
 
 func Adapter(deviceName string) (res *Adapter1, err error) {
-	exists, err := Exists(deviceName)
+	exists, err := adapterExists(deviceName)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, eDoesntExist
+		return nil, eAdatpterNotExistent
 	}
 
 	res = &Adapter1{

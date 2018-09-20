@@ -3,7 +3,7 @@ package dbusHelper
 import (
 	"fmt"
 	"github.com/godbus/dbus"
-	"github.com/pkg/errors"
+	"errors"
 	"sync"
 )
 
