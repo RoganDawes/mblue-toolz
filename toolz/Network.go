@@ -1,6 +1,7 @@
 package toolz
 
 import (
+	"github.com/godbus/dbus"
 	"github.com/mame82/mblue-toolz/dbusHelper"
 )
 
@@ -32,8 +33,8 @@ func (a *NetworkServer1) Close() {
 	a.c.Disconnect()
 }
 
-func NetworkServer(deviceName string) (res *NetworkServer1, err error) {
-	exists, err := adapterExists(deviceName)
+func NetworkServer(adapterPath dbus.ObjectPath) (res *NetworkServer1, err error) {
+	exists, err := adapterExists(adapterPath)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +43,7 @@ func NetworkServer(deviceName string) (res *NetworkServer1, err error) {
 	}
 
 	res = &NetworkServer1{
-		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameNetworkServer1Interface, "/org/bluez/"+deviceName),
+		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameNetworkServer1Interface, adapterPath),
 	}
 	return
 }

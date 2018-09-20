@@ -62,7 +62,7 @@ func Tests() {
 	fmt.Println("\nTEST network-api server (bridge 'testbr' has to be created upfront)\n===============================================")
 
 	// Test enable PAN network service (bridge with name testbr has to be created upfront, handled by P4wnP1 netlink interface)
-	nwSrv, err := toolz.NetworkServer("hci0")
+	nwSrv, err := toolz.NetworkServer(toolz.AdapterNameToDBusPath("hci0"))
 	if err == nil {
 		fmt.Println("Established NetworkServer1 interface ...")
 		fmt.Println("Enabeling 'nap' service, new bnep connections are attached to 'testbr' (has to exist already)")
@@ -75,6 +75,7 @@ func Tests() {
 	} else {
 		fmt.Printf("Error creating Networkserver1 interface: %v\n", err)
 	}
+
 
 
 	// 	Test Bluetooth Control based socket management (under construction)
@@ -142,7 +143,6 @@ func Tests() {
 		}
 
 	}
-
 	fmt.Println("\nEND\n===============")
 }
 */
@@ -307,7 +307,7 @@ func main() {
 	AdapterName := "hci0" //Assume the controller used by DBus is called "hci0" change if needed
 	useSSP := true // if true, the demo tries to enable SSP, otherwise to disable (influence on pairing agent behavior)
 
-	hci0_adapter,err := toolz.Adapter(AdapterName)
+	hci0_adapter,err := toolz.Adapter(toolz.AdapterNameToDBusPath(AdapterName))
 	if err != nil { panic(fmt.Sprintf("Couldn't open adapter '%s'", AdapterName)) }
 
 	// Try to set new alias, don't account for error results

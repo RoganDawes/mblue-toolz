@@ -31,18 +31,14 @@ const (
 )
 
 
-func adapterExists(adapterName string) (exists bool, err error) {
+func adapterExists(adapterPath dbus.ObjectPath) (exists bool, err error) {
 	om, err := dbusHelper.NewObjectManager()
 	if err != nil {
 		return
 	}
 	defer om.Close()
 
-//	objs := om.GetManagedObjects()
-//
-
-	opath := dbus.ObjectPath("/org/bluez/" + adapterName)
-	adapter,exists,err := om.GetObject(opath)
+	adapter,exists,err := om.GetObject(adapterPath)
 	if !exists || err != nil {
 		return
 	}
@@ -224,8 +220,8 @@ func (a *Adapter1) GetModalias() (res string, err error) {
 	return val.Value().(string), nil
 }
 
-func Adapter(deviceName string) (res *Adapter1, err error) {
-	exists, err := adapterExists(deviceName)
+func Adapter(adapterPath dbus.ObjectPath) (res *Adapter1, err error) {
+	exists, err := adapterExists(adapterPath)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +230,11 @@ func Adapter(deviceName string) (res *Adapter1, err error) {
 	}
 
 	res = &Adapter1{
-		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameAdapter1Interface, "/org/bluez/"+deviceName),
+		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameAdapter1Interface, adapterPath),
 	}
 	return
+}
+
+func AdapterNameToDBusPath(adapterName string) dbus.ObjectPath {
+	return dbus.ObjectPath("/org/bluez/"+adapterName)
 }

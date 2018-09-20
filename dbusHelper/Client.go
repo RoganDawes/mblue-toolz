@@ -25,10 +25,10 @@ type Client struct {
 
 	destinationName string // Destination to connect to: 		org.bluez
 	connInterface   string //DBus Interface to connect to : 			org.freedesktop.DBus.ObjectManager
-	path            string //Path to connect to : 						/
+	path            dbus.ObjectPath //Path to connect to : 						/
 }
 
-func NewClient(busType BusType, destination string, Interface string, Path string) (client *Client) {
+func NewClient(busType BusType, destination string, Interface string, Path dbus.ObjectPath) (client *Client) {
 	return &Client{
 		connType:        busType,
 		destinationName: destination,

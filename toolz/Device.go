@@ -121,7 +121,7 @@ func (d *Device1) SetBlocked(val bool) (err error) {
 	return d.c.SetProperty(PropDeviceBlocked, val)
 }
 
-func Device(devicePath string) (res *Device1, err error) {
+func Device(devicePath dbus.ObjectPath) (res *Device1, err error) {
 
 	exists, err := deviceExists(devicePath)
 	if err != nil || !exists{
@@ -135,18 +135,14 @@ func Device(devicePath string) (res *Device1, err error) {
 	return
 }
 
-func deviceExists(devicePath string) (exists bool, err error) {
+func deviceExists(devicePath dbus.ObjectPath) (exists bool, err error) {
 	om, err := dbusHelper.NewObjectManager()
 	if err != nil {
 		return
 	}
 	defer om.Close()
 
-	//	objs := om.GetManagedObjects()
-	//
-
-	opath := dbus.ObjectPath(devicePath)
-	adapter,exists,err := om.GetObject(opath)
+	adapter,exists,err := om.GetObject(devicePath)
 	if !exists || err != nil {
 		return
 	}
