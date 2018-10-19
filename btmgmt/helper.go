@@ -18,7 +18,7 @@ func zeroTerminateSlice(src []byte) []byte {
 	return src
 }
 
-func testBit(in byte, n uint8) bool {
+func testBit(in uint32, n uint8) bool {
 	return in&(1<<n) > 0
 }
 

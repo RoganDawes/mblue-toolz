@@ -3,6 +3,7 @@ package btmgmt
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/mame82/P4wnP1_go/mnetlink"
 	"net"
 )
 
@@ -144,10 +145,12 @@ type ControllerSettings struct {
 }
 
 func (cd *ControllerSettings) UpdateFromPayload(pay []byte) (err error) {
-	if len(pay) < 1 {
+	if len(pay) != 4 {
 		return ErrPayloadFormat
 	}
-	b := (pay)[0]
+	//b := (pay)[0]
+	b := mnetlink.Hbo().Uint32(pay[0:4])
+
 	cd.Powered = testBit(b, 0)
 	cd.Connectable = testBit(b, 1)
 	cd.FastConnectable = testBit(b, 2)
