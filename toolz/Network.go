@@ -84,7 +84,7 @@ func (a *Network1) Close() {
 	a.c.Disconnect()
 }
 
-func Network(targetDevicePath dbus.ObjectPath) (res *NetworkServer1, err error) {
+func Network(targetDevicePath dbus.ObjectPath) (res *Network1, err error) {
 	exists, err := deviceExists(targetDevicePath)
 	if err != nil {
 		return nil, err
