@@ -119,6 +119,10 @@ func (c *Client) GetProperty(name string) (res dbus.Variant, err error){
 	return
 }
 
+func (c *Client) GetPath() (path dbus.ObjectPath){
+	return c.path
+}
+
 func (c *Client) SetProperty(name string, value interface{}) (err error){
 	if c.conn == nil {
 		if err = c.Connect(); err != nil {
@@ -134,3 +138,4 @@ func (c *Client) SetProperty(name string, value interface{}) (err error){
 
 	return err
 }
+

@@ -49,6 +49,11 @@ func (d *Device1) Close() {
 	d.c.Disconnect()
 }
 
+func (d *Device1) GetPath() dbus.ObjectPath {
+	// closes CLients DBus connection
+	return d.c.GetPath()
+}
+
 func (d *Device1) Connect() error {
 	call, err := d.c.Call("Connect")
 	if err != nil {
