@@ -100,7 +100,7 @@ func (a *Network1) GetInterface() (res string, err error) {
 }
 
 func (a *Network1) GetUUID() (res string, err error) {
-	val, err := a.c.GetProperty(PropNetworkInterface)
+	val, err := a.c.GetProperty(PropNetworkUUID)
 	if err != nil {
 		return
 	}
