@@ -15,6 +15,13 @@ const (
 	UUID_NETWORK_SERVER_GN NetworkServerUUID = "gn"
 )
 
+const (
+	PropNetworkConnected             = "Connected" //bool, read only
+	PropNetworkInterface             = "Interface" //string, read only
+	PropNetworkUUID             = "UUID" //string, read only
+)
+
+
 //NetworkServer1
 type NetworkServer1 struct {
 	c *dbusHelper.Client
@@ -84,6 +91,32 @@ func (a *Network1) Close() {
 	a.c.Disconnect()
 }
 
+func (a *Network1) GetInterface() (res string, err error) {
+	val, err := a.c.GetProperty(PropNetworkInterface)
+	if err != nil {
+		return
+	}
+	return val.Value().(string), nil
+}
+
+func (a *Network1) GetUUID() (res string, err error) {
+	val, err := a.c.GetProperty(PropNetworkInterface)
+	if err != nil {
+		return
+	}
+	return val.Value().(string), nil
+}
+
+func (a *Network1) GetConnected() (res bool, err error) {
+	val, err := a.c.GetProperty(PropNetworkConnected)
+	if err != nil {
+		return
+	}
+	return val.Value().(bool), nil
+}
+
+
+
 func Network(targetDevicePath dbus.ObjectPath) (res *Network1, err error) {
 	exists, err := deviceExists(targetDevicePath)
 	if err != nil {
@@ -93,7 +126,7 @@ func Network(targetDevicePath dbus.ObjectPath) (res *Network1, err error) {
 		return nil, eDeviceNotExistent
 	}
 
-	res = &NetworkServer1{
+	res = &Network1{
 		c: dbusHelper.NewClient(dbusHelper.SystemBus, "org.bluez", DBusNameNetwork1Interface, targetDevicePath),
 	}
 	return
