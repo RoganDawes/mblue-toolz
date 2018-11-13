@@ -65,6 +65,10 @@ type ControllerInformation struct {
 	ClassOfDevice     DeviceClass // 3, till clear how to parse
 	Name              string      //[249]byte, 0x00 terminated
 	ShortName         string      //[11]byte, 0x00 terminated
+
+	ServiceNetworkServerGn bool
+	ServiceNetworkServerNap bool
+	ServiceNetworkServerPanu bool
 }
 
 func (ci *ControllerInformation) UpdateFromPayload(p []byte) (err error) {
