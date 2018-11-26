@@ -14,7 +14,7 @@ Status: Under construction, experimental forever
 
 ## Copyright
 
-    mblue-toolz native Go Bluez API for P4wnP1 successor (yet unnamed)
+    mblue-toolz native Go Bluez API for P4wnP1 A.L.O.A.
     Copyright (C) 2018 Marcus Mengs
 
     This program is free software: you can redistribute it and/or modify
