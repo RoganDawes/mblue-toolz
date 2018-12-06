@@ -3,7 +3,7 @@ package btmgmt
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/mame82/P4wnP1_go/mnetlink"
+	"github.com/mame82/P4wnP1_aloa/mnetlink"
 	"net"
 )
 
